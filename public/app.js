@@ -12,6 +12,7 @@
     "Прибирання ресторану / бару",
     "Інше"
   ];
+  var UNITS = ["л", "кг", "шт", "уп"];
   var DOW = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
   var MONTHS = ["Січень", "Лютий", "Березень", "Квітень", "Травень", "Червень", "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень"];
   var POLL_MS = 20000;
@@ -22,6 +23,7 @@
     clients: new Map(),
     jobs: new Map(),
     invoices: new Map(),
+    inventory: new Map(),
     users: [],
     roster: [],
     telegram: null,
@@ -122,6 +124,7 @@
     document.getElementById("me-role").textContent = user.role === "admin" ? "Адміністратор" : "Співробітник";
     document.getElementById("me-avatar").textContent = (user.name || user.username).trim().slice(0, 1).toUpperCase();
     document.getElementById("nav-team").hidden = user.role !== "admin";
+    document.getElementById("nav-inventory").hidden = user.role !== "admin";
     setView("dashboard");
     loadAll();
     refreshTelegramBadge();
@@ -249,13 +252,15 @@
       api("GET", "/api/jobs"),
       api("GET", "/api/invoices"),
       state.me && state.me.role === "admin" ? api("GET", "/api/users") : Promise.resolve(null),
-      api("GET", "/api/users/roster")
+      api("GET", "/api/users/roster"),
+      state.me && state.me.role === "admin" ? api("GET", "/api/inventory") : Promise.resolve(null)
     ]).then(function (res) {
       state.clients = new Map(res[0].map(function (c) { return [c.id, c]; }));
       state.jobs = new Map(res[1].map(function (j) { return [j.id, j]; }));
       state.invoices = new Map(res[2].map(function (i) { return [i.id, i]; }));
       if (res[3]) state.users = res[3];
       state.roster = res[4] || [];
+      if (res[5]) state.inventory = new Map(res[5].map(function (it) { return [it.id, it]; }));
       render();
     }).catch(function (err) {
       if (err && err.code !== "not_authenticated") toast(err.message || "Не вдалося оновити дані", true);
@@ -282,6 +287,7 @@
     return Array.from(state.jobs.values()).slice().sort(function (a, b) { return (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")); });
   }
   function invoicesList() { return Array.from(state.invoices.values()); }
+  function inventoryList() { return Array.from(state.inventory.values()); }
   function clientsList() { return Array.from(state.clients.values()); }
   function isOverdue(inv) { return inv.status === "unpaid" && inv.dueDate && inv.dueDate < todayStr(); }
   function nextJobForClient(clientId) {
@@ -775,6 +781,174 @@
     }
   }
 
+  /* ============ render: inventory (admin) ============ */
+  function renderInventory() {
+    if (!state.me || state.me.role !== "admin") return;
+    var tbody = document.getElementById("inventory-tbody");
+    var list = inventoryList().sort(function (a, b) { return (a.name || "").localeCompare(b.name || "", "uk"); });
+
+    document.getElementById("inventory-empty").hidden = !!list.length;
+    document.querySelector("#view-inventory .table-wrap").style.display = list.length ? "" : "none";
+
+    tbody.innerHTML = list.map(function (it) {
+      var stockPill = '<span class="pill ' + (it.low ? "overdue" : "active") + '"><span class="pill-dot"></span>' + Number(it.quantity) + " " + escapeHtml(it.unit) + '</span>';
+      return '<tr class="clickable" data-item="' + it.id + '">' +
+        '<td class="cell-title">' + escapeHtml(it.name) + '</td>' +
+        '<td>' + stockPill + '</td>' +
+        '<td class="cell-sub">' + Number(it.minQuantity || 0) + ' ' + escapeHtml(it.unit) + '</td>' +
+        '<td><div class="row-actions">' +
+          '<button class="btn btn-sm" data-log-usage="' + it.id + '">Списати</button>' +
+          '<button class="btn btn-sm btn-ghost" data-log-restock="' + it.id + '">Поповнити</button>' +
+          '<button class="icon-btn" data-edit-item="' + it.id + '" title="Редагувати"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
+        '</div></td></tr>';
+    }).join("");
+
+    document.getElementById("nav-count-inventory").textContent = list.filter(function (it) { return it.low; }).length || "";
+
+    tbody.querySelectorAll("tr[data-item]").forEach(function (row) {
+      row.addEventListener("click", function (ev) {
+        if (ev.target.closest("button")) return;
+        openInventoryDrawer(row.getAttribute("data-item"));
+      });
+    });
+    tbody.querySelectorAll("[data-log-usage]").forEach(function (btn) {
+      btn.addEventListener("click", function (ev) { ev.stopPropagation(); openInventoryLogModal(btn.getAttribute("data-log-usage"), "usage"); });
+    });
+    tbody.querySelectorAll("[data-log-restock]").forEach(function (btn) {
+      btn.addEventListener("click", function (ev) { ev.stopPropagation(); openInventoryLogModal(btn.getAttribute("data-log-restock"), "restock"); });
+    });
+    tbody.querySelectorAll("[data-edit-item]").forEach(function (btn) {
+      btn.addEventListener("click", function (ev) { ev.stopPropagation(); openInventoryItemModal(btn.getAttribute("data-edit-item")); });
+    });
+  }
+
+  /* ============ modal: inventory item (create/edit) ============ */
+  function openInventoryItemModal(id) {
+    var it = id ? state.inventory.get(id) : { name: "", unit: "л", quantity: 0, minQuantity: 0 };
+    var root = document.getElementById("modal-root");
+    root.innerHTML =
+      '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
+        '<div class="modal-head"><h3>' + (id ? "Редагувати товар" : "Новий товар") + '</h3>' +
+          '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+        '<div class="modal-body">' +
+          '<div class="field"><label>Назва *</label><input type="text" id="f-name" value="' + escapeHtml(it.name) + '" placeholder="Напр. Засіб для скла"></div>' +
+          '<div class="field-row">' +
+            '<div class="field"><label>Одиниця виміру</label><select id="f-unit">' +
+              UNITS.map(function (u) { return '<option value="' + u + '"' + (it.unit === u ? " selected" : "") + '>' + u + '</option>'; }).join("") +
+            '</select></div>' +
+            (id ? '' : '<div class="field"><label>Початковий залишок</label><input type="number" id="f-qty" value="' + it.quantity + '" min="0" step="0.1"></div>') +
+          '</div>' +
+          '<div class="field"><label>Мінімальний залишок (поріг попередження)</label><input type="number" id="f-min" value="' + (it.minQuantity || 0) + '" min="0" step="0.1"></div>' +
+        '</div>' +
+        '<div class="modal-foot">' + (id ? '<button class="btn btn-danger-text" id="ov-delete">Видалити</button>' : '<span></span>') +
+          '<button class="btn btn-primary" id="ov-save">Зберегти</button></div></div></div>';
+
+    document.getElementById("ov-close").addEventListener("click", closeOverlay);
+    document.getElementById("ov-backdrop").addEventListener("click", function (e) { if (e.target.id === "ov-backdrop") closeOverlay(); });
+    document.getElementById("ov-save").addEventListener("click", function () {
+      var name = document.getElementById("f-name").value.trim();
+      if (!name) { toast("Вкажіть назву товару", true); return; }
+      var data = {
+        name: name,
+        unit: document.getElementById("f-unit").value,
+        minQuantity: document.getElementById("f-min").value ? Number(document.getElementById("f-min").value) : 0
+      };
+      if (!id) data.quantity = document.getElementById("f-qty").value ? Number(document.getElementById("f-qty").value) : 0;
+      var req = id ? api("PATCH", "/api/inventory/" + id, data) : api("POST", "/api/inventory", data);
+      req.then(function () { toast(id ? "Товар оновлено" : "Товар додано"); closeOverlay(); loadAll(); })
+         .catch(function (err) { toast(err.message, true); });
+    });
+    if (id) {
+      document.getElementById("ov-delete").addEventListener("click", function () {
+        if (!confirm("Видалити товар \"" + it.name + "\" зі складу? Історію списань буде збережено.")) return;
+        api("DELETE", "/api/inventory/" + id).then(function () { toast("Товар видалено"); closeOverlay(); loadAll(); });
+      });
+    }
+  }
+
+  /* ============ modal: log usage / restock ============ */
+  function inventoryJobOptionsHtml() {
+    var jobs = jobsSorted().slice().reverse();
+    return '<option value="">— не пов\'язано із завданням —</option>' + jobs.map(function (j) {
+      return '<option value="' + j.id + '">' + fmtDateHuman(j.date) + " · " + escapeHtml(clientName(j.clientId)) + (j.service ? " · " + escapeHtml(j.service) : "") + '</option>';
+    }).join("");
+  }
+
+  function openInventoryLogModal(itemId, type) {
+    var it = state.inventory.get(itemId);
+    if (!it) return;
+    var isUsage = type === "usage";
+    var root = document.getElementById("modal-root");
+    root.innerHTML =
+      '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
+        '<div class="modal-head"><h3>' + (isUsage ? "Списати: " : "Поповнити: ") + escapeHtml(it.name) + '</h3>' +
+          '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+        '<div class="modal-body">' +
+          '<p class="auth-sub">Поточний залишок: ' + Number(it.quantity) + " " + escapeHtml(it.unit) + '</p>' +
+          '<div class="field"><label>Кількість (' + escapeHtml(it.unit) + ') *</label><input type="number" id="f-qty" min="0.01" step="0.1" autofocus></div>' +
+          (isUsage ? '<div class="field"><label>Завдання</label><select id="f-job">' + inventoryJobOptionsHtml() + '</select></div>' : '') +
+          '<div class="field"><label>Нотатка</label><input type="text" id="f-note" placeholder="Напр. причина, партія..."></div>' +
+        '</div>' +
+        '<div class="modal-foot"><span></span><button class="btn btn-primary" id="ov-save">' + (isUsage ? "Списати" : "Додати на склад") + '</button></div></div></div>';
+
+    document.getElementById("ov-close").addEventListener("click", closeOverlay);
+    document.getElementById("ov-backdrop").addEventListener("click", function (e) { if (e.target.id === "ov-backdrop") closeOverlay(); });
+    document.getElementById("ov-save").addEventListener("click", function () {
+      var qty = Number(document.getElementById("f-qty").value);
+      if (!qty || qty <= 0) { toast("Вкажіть кількість більше нуля", true); return; }
+      var data = {
+        type: type,
+        quantity: qty,
+        note: document.getElementById("f-note").value.trim()
+      };
+      if (isUsage) {
+        var jobId = document.getElementById("f-job").value;
+        if (jobId) data.jobId = jobId;
+      }
+      api("POST", "/api/inventory/" + itemId + "/log", data).then(function () {
+        toast(isUsage ? "Списано зі складу" : "Склад поповнено");
+        closeOverlay(); loadAll();
+      }).catch(function (err) { toast(err.message, true); });
+    });
+  }
+
+  /* ============ drawer: inventory item history ============ */
+  function openInventoryDrawer(id) {
+    var it = state.inventory.get(id);
+    if (!it) return;
+    var root = document.getElementById("drawer-root");
+    root.innerHTML =
+      '<div class="drawer-backdrop" id="dr-backdrop"></div><div class="drawer">' +
+        '<div class="drawer-head"><div><h3>' + escapeHtml(it.name) + '</h3><span class="pill ' + (it.low ? "overdue" : "active") + '" style="margin-top:6px;"><span class="pill-dot"></span>' + Number(it.quantity) + ' ' + escapeHtml(it.unit) + '</span></div>' +
+          '<button class="icon-btn" id="dr-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+        '<div class="drawer-body">' +
+          '<div class="drawer-section"><h4>Інформація</h4><div class="kv">' +
+            '<div class="kv-row"><div class="k">Залишок</div><div class="v">' + Number(it.quantity) + ' ' + escapeHtml(it.unit) + '</div></div>' +
+            '<div class="kv-row"><div class="k">Мінімальний залишок</div><div class="v">' + Number(it.minQuantity || 0) + ' ' + escapeHtml(it.unit) + '</div></div></div></div>' +
+          '<div class="drawer-section"><h4>Історія</h4><div id="inv-log-list"><div class="empty-note">Завантаження...</div></div></div>' +
+        '</div></div>';
+
+    function close() { root.innerHTML = ""; }
+    document.getElementById("dr-close").addEventListener("click", close);
+    document.getElementById("dr-backdrop").addEventListener("click", close);
+
+    api("GET", "/api/inventory/logs?itemId=" + id).then(function (logs) {
+      var el = document.getElementById("inv-log-list");
+      if (!el) return; // drawer already closed
+      if (!logs.length) { el.innerHTML = '<div class="empty-note">Ще немає записів.</div>'; return; }
+      el.innerHTML = logs.map(function (l) {
+        var typeLabel = l.type === "usage" ? "Списано" : l.type === "restock" ? "Поповнено" : "Коригування";
+        var sign = l.type === "usage" ? "−" : l.type === "restock" ? "+" : "";
+        return '<div class="job-row"><div class="agenda-date">' + fmtDateHuman((l.createdAt || "").slice(0, 10)) + '</div>' +
+          '<div class="agenda-main"><div class="title">' + typeLabel + ": " + sign + Number(l.quantity) + " " + escapeHtml(l.unit || "") + '</div>' +
+          '<div class="meta">' + (l.jobLabel ? escapeHtml(l.jobLabel) + " · " : "") + escapeHtml(l.userName || "") + (l.note ? " · " + escapeHtml(l.note) : "") + '</div></div></div>';
+      }).join("");
+    }).catch(function () {
+      var el = document.getElementById("inv-log-list");
+      if (el) el.innerHTML = '<div class="empty-note">Не вдалося завантажити історію.</div>';
+    });
+  }
+
   /* ============ modal: new employee ============ */
   function openUserModal() {
     var root = document.getElementById("modal-root");
@@ -811,9 +985,13 @@
     if (state.view === "dashboard") renderDashboard();
     if (state.view === "clients") renderClients();
     if (state.view === "invoices") renderInvoices();
+    if (state.view === "inventory") renderInventory();
     if (state.view === "team") renderTeam();
     document.getElementById("nav-count-clients").textContent = state.clients.size || "";
     document.getElementById("nav-count-invoices").textContent = invoicesList().filter(function (i) { return i.status === "unpaid"; }).length || "";
+    if (state.me.role === "admin") {
+      document.getElementById("nav-count-inventory").textContent = inventoryList().filter(function (it) { return it.low; }).length || "";
+    }
   }
 
   /* ============ mobile menu (hamburger) ============ */
@@ -841,6 +1019,7 @@
   document.getElementById("btn-new-job-dash").addEventListener("click", function () { openJobModal(null); });
   document.getElementById("btn-new-invoice").addEventListener("click", function () { openInvoiceModal(null); });
   document.getElementById("btn-new-user").addEventListener("click", function () { openUserModal(); });
+  document.getElementById("btn-new-inventory-item").addEventListener("click", function () { openInventoryItemModal(null); });
 
   document.getElementById("cal-prev").addEventListener("click", function () {
     state.calMonth--; if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; }
