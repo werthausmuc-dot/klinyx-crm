@@ -85,6 +85,11 @@
         Рахунки
         <span class="count" id="nav-count-invoices"></span>
       </button>
+      <button class="nav-item" data-view="inventory" id="nav-inventory" hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8L12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+        Склад
+        <span class="count" id="nav-count-inventory"></span>
+      </button>
       <button class="nav-item" data-view="team" id="nav-team" hidden>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Команда
@@ -222,6 +227,26 @@
         </table>
       </div>
       <div class="empty-note" id="invoices-empty" hidden>Рахунків ще немає.</div>
+    </section>
+
+    <!-- INVENTORY (admin only) -->
+    <section class="view" id="view-inventory">
+      <div class="page-header">
+        <div><h1>Склад</h1><p class="sub">Облік хімії та витратних матеріалів</p></div>
+        <div class="header-actions">
+          <button class="btn btn-primary" id="btn-new-inventory-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Додати товар
+          </button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Товар</th><th>Залишок</th><th>Мін. залишок</th><th></th></tr></thead>
+          <tbody id="inventory-tbody"></tbody>
+        </table>
+      </div>
+      <div class="empty-note" id="inventory-empty" hidden>Товарів ще немає. Додайте перший, щоб почати облік хімії.</div>
     </section>
 
     <!-- TEAM (admin only) -->
