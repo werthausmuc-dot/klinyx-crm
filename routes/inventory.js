@@ -10,6 +10,12 @@ const { sendJson, readJsonBody } = require("../lib/http-utils");
 const UNITS = ["л", "кг", "шт", "уп"];
 const LOG_TYPES = ["usage", "restock", "adjust"];
 
+// A resized/compressed photo comes in as a data: URL (see the client-side
+// canvas resize in app.js) — capped well under readJsonBody's 1MB body
+// limit so a normal photo always fits with room for the rest of the form.
+const MAX_PHOTO_LENGTH = 900000;
+const PHOTO_RE = /^data:image\/(png|jpe?g|webp);base64,/;
+
 function cleanItem(body, existing) {
   const data = {};
   if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
@@ -23,6 +29,16 @@ function cleanItem(body, existing) {
     data.minQuantity = Math.max(0, Number(body.minQuantity));
   }
   if (!existing && data.minQuantity === undefined) data.minQuantity = 0;
+  // Інвентарний номер — a free-text asset/SKU tag the business assigns itself.
+  if (typeof body.code === "string") data.code = body.code.trim();
+  // Photo: null explicitly clears it; a valid small data: URL replaces it;
+  // anything else (missing, malformed, oversized) is silently ignored so a
+  // bad photo never blocks the rest of the item's fields from saving.
+  if (body.photo === null) {
+    data.photo = null;
+  } else if (typeof body.photo === "string" && body.photo && body.photo.length <= MAX_PHOTO_LENGTH && PHOTO_RE.test(body.photo)) {
+    data.photo = body.photo;
+  }
   return data;
 }
 
@@ -40,7 +56,7 @@ module.exports = function registerInventoryRoutes(router) {
 
   router.post("/api/inventory", async (req, res) => {
     if (!requireAdmin(req, res)) return;
-    const body = await readJsonBody(req);
+    const body = await readJsonBody(req, 1.5 * 1024 * 1024); // room for a photo data: URL
     const data = cleanItem(body, null);
     if (!data.name) return sendJson(res, 400, { error: "invalid_input", message: "Вкажіть назву товару." });
     const created = await store.create("inventory", data);
@@ -51,7 +67,7 @@ module.exports = function registerInventoryRoutes(router) {
     if (!requireAdmin(req, res)) return;
     const existing = await store.get("inventory", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
-    const body = await readJsonBody(req);
+    const body = await readJsonBody(req, 1.5 * 1024 * 1024); // room for a photo data: URL
     const patch = cleanItem(body, existing);
     const updated = await store.update("inventory", params.id, patch);
     sendJson(res, 200, withLowFlag(updated));
