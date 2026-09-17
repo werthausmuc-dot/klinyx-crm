@@ -495,6 +495,7 @@
         '<td><span class="pill ' + statusClass + '"><span class="pill-dot"></span>' + statusLabelInvoice(inv) + '</span></td>' +
         '<td><div class="row-actions">' +
           (inv.status === "unpaid" ? '<button class="btn btn-sm" data-mark-paid="' + inv.id + '">Позначити оплаченим</button>' : '<button class="btn btn-sm btn-ghost" data-mark-unpaid="' + inv.id + '">Скасувати оплату</button>') +
+          '<button class="icon-btn" data-edit-invoice="' + inv.id + '" title="Редагувати"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
           '<button class="icon-btn" data-del-invoice="' + inv.id + '" title="Видалити"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button></div></td></tr>';
     }).join("");
 
@@ -509,6 +510,9 @@
       btn.addEventListener("click", function () {
         api("PATCH", "/api/invoices/" + btn.getAttribute("data-mark-unpaid"), { status: "unpaid" }).then(function () { loadAll(); });
       });
+    });
+    tbody.querySelectorAll("[data-edit-invoice]").forEach(function (btn) {
+      btn.addEventListener("click", function () { openInvoiceModal(btn.getAttribute("data-edit-invoice")); });
     });
     tbody.querySelectorAll("[data-del-invoice]").forEach(function (btn) {
       btn.addEventListener("click", function () {
