@@ -20,6 +20,7 @@ require("./routes/users")(router);
 require("./routes/clients")(router);
 require("./routes/jobs")(router);
 require("./routes/invoices")(router);
+require("./routes/inventory")(router);
 require("./routes/telegram")(router);
 
 async function getCurrentUser(req) {
