@@ -160,27 +160,33 @@
     }).catch(function (err) { toast(err.message, true); closeOverlay(); });
   }
 
-  function renderTelegramModalBody(info) {
+  function renderTelegramModalBody(info, showCodeEvenIfLinked) {
     var body = document.getElementById("tg-modal-body");
     if (!body) return;
     if (!info.configured) {
       body.innerHTML = '<p class="auth-sub">Telegram-бот ще не налаштований адміністратором сервера. Зверніться до того, хто розгортав CRM.</p>';
       return;
     }
-    if (info.linked) {
+    // A fresh code doesn't unlink the account by itself — telegramChatId
+    // only changes once someone actually sends /start <newcode> to the bot.
+    // So right after "regenerate", info.linked is still true; without this
+    // flag the modal would just show the old "already linked" message again
+    // and the person would have no code/link to actually act on.
+    if (info.linked && !showCodeEvenIfLinked) {
       body.innerHTML =
         '<p class="auth-sub" style="color:var(--success);">✅ Ваш акаунт під\'єднано — сповіщення про призначені завдання приходитимуть у Telegram.</p>' +
         '<button class="btn btn-sm" id="tg-relink">Під\'єднати інший Telegram / переприв\'язати</button>';
     } else {
       body.innerHTML =
-        '<p class="auth-sub">Натисніть кнопку нижче — відкриється Telegram і бот сам вас під\'єднає.</p>' +
+        (info.linked ? '<p class="auth-sub">Щоб перепідключити на інший Telegram-акаунт, надішліть боту новий код нижче — щойно він це отримає, старий зв\'язок заміниться новим.</p>' :
+          '<p class="auth-sub">Натисніть кнопку нижче — відкриється Telegram і бот сам вас під\'єднає.</p>') +
         (info.deepLink ? '<a class="btn btn-primary btn-block" href="' + info.deepLink + '" target="_blank" rel="noopener">Під\'єднати Telegram</a>' : '') +
         '<p class="auth-sub" style="margin-top:14px;">Або вручну: напишіть боту' + (info.botUsername ? ' <b>@' + escapeHtml(info.botUsername) + '</b>' : '') + ' команду:</p>' +
         '<div class="kv-row"><div class="v mono" style="font-size:18px;">/start ' + escapeHtml(info.linkCode || "") + '</div></div>' +
         '<button class="btn btn-sm" id="tg-regen" style="margin-top:12px;">Новий код</button>';
     }
     var relink = document.getElementById("tg-relink");
-    if (relink) relink.addEventListener("click", function () { regenerateTelegramCode(); });
+    if (relink) relink.addEventListener("click", function () { renderTelegramModalBody(state.telegram || {}, true); });
     var regen = document.getElementById("tg-regen");
     if (regen) regen.addEventListener("click", function () { regenerateTelegramCode(); });
   }
@@ -190,8 +196,8 @@
       return api("GET", "/api/telegram/me");
     }).then(function (data) {
       state.telegram = data;
-      renderTelegramModalBody(data);
-      toast("Новий код згенеровано");
+      renderTelegramModalBody(data, true);
+      toast("Новий код згенеровано — надішліть його боту в Telegram");
     }).catch(function (err) { toast(err.message, true); });
   }
 
@@ -518,6 +524,7 @@
         '<td>' + (u.telegramLinked ? '<span class="pill active"><span class="pill-dot"></span>підключено</span>' : '<span class="pill lead"><span class="pill-dot"></span>—</span>') + '</td>' +
         '<td><div class="row-actions">' +
           '<button class="btn btn-sm" data-reset-pw="' + u.id + '">Скинути пароль</button>' +
+          '<button class="btn btn-sm btn-ghost" data-toggle-role="' + u.id + '">' + (u.role === "admin" ? "Прибрати адміна" : "Зробити адміном") + '</button>' +
           '<button class="btn btn-sm btn-ghost" data-toggle-active="' + u.id + '">' + (u.active ? "Вимкнути" : "Увімкнути") + '</button>' +
           (u.id === state.me.id ? '' : '<button class="icon-btn" data-del-user="' + u.id + '" title="Видалити"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button>') +
         '</div></td></tr>';
@@ -528,6 +535,18 @@
         var pw = prompt("Новий пароль для цього співробітника (мінімум 8 символів):");
         if (!pw) return;
         api("PATCH", "/api/users/" + btn.getAttribute("data-reset-pw"), { password: pw }).then(function () { toast("Пароль оновлено"); }).catch(function (err) { toast(err.message, true); });
+      });
+    });
+    tbody.querySelectorAll("[data-toggle-role]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-toggle-role");
+        var u = state.users.find(function (x) { return x.id === id; });
+        var nextRole = u.role === "admin" ? "employee" : "admin";
+        var msg = nextRole === "admin"
+          ? "Призначити " + u.name + " адміністратором?"
+          : "Прибрати права адміністратора в " + u.name + "?";
+        if (!confirm(msg)) return;
+        api("PATCH", "/api/users/" + id, { role: nextRole }).then(function () { toast("Роль оновлено"); loadAll(); }).catch(function (err) { toast(err.message, true); });
       });
     });
     tbody.querySelectorAll("[data-toggle-active]").forEach(function (btn) {
