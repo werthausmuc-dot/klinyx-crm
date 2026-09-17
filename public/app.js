@@ -201,7 +201,7 @@
     }).catch(function (err) { toast(err.message, true); });
   }
 
-  document.getElementById("btn-telegram").addEventListener("click", openTelegramModal);
+  document.getElementById("btn-telegram").addEventListener("click", function () { closeMobileMenu(); openTelegramModal(); });
 
   document.getElementById("setup-form").addEventListener("submit", function (e) {
     e.preventDefault();
@@ -235,6 +235,7 @@
   });
 
   document.getElementById("btn-logout").addEventListener("click", function () {
+    closeMobileMenu();
     api("POST", "/api/auth/logout").then(function () {
       if (window.__klinyxPoll) { clearInterval(window.__klinyxPoll); window.__klinyxPoll = null; }
       showLogin();
@@ -815,9 +816,25 @@
     document.getElementById("nav-count-invoices").textContent = invoicesList().filter(function (i) { return i.status === "unpaid"; }).length || "";
   }
 
+  /* ============ mobile menu (hamburger) ============ */
+  function openMobileMenu() {
+    document.getElementById("sidebar").classList.add("open");
+    document.getElementById("sidebar-backdrop").classList.add("open");
+  }
+  function closeMobileMenu() {
+    document.getElementById("sidebar").classList.remove("open");
+    document.getElementById("sidebar-backdrop").classList.remove("open");
+  }
+  var btnMenuOpen = document.getElementById("btn-menu-open");
+  if (btnMenuOpen) btnMenuOpen.addEventListener("click", openMobileMenu);
+  var btnMenuClose = document.getElementById("btn-menu-close");
+  if (btnMenuClose) btnMenuClose.addEventListener("click", closeMobileMenu);
+  var sidebarBackdrop = document.getElementById("sidebar-backdrop");
+  if (sidebarBackdrop) sidebarBackdrop.addEventListener("click", closeMobileMenu);
+
   /* ============ static wiring ============ */
   document.querySelectorAll(".nav-item").forEach(function (el) {
-    el.addEventListener("click", function () { setView(el.getAttribute("data-view")); });
+    el.addEventListener("click", function () { setView(el.getAttribute("data-view")); closeMobileMenu(); });
   });
   document.getElementById("btn-new-client").addEventListener("click", function () { openClientModal(null); });
   document.getElementById("btn-new-client-dash").addEventListener("click", function () { openClientModal(null); });
