@@ -23,6 +23,8 @@
     jobs: new Map(),
     invoices: new Map(),
     users: [],
+    roster: [],
+    telegram: null,
     view: "dashboard",
     calYear: new Date().getFullYear(),
     calMonth: new Date().getMonth(),
@@ -122,10 +124,78 @@
     document.getElementById("nav-team").hidden = user.role !== "admin";
     setView("dashboard");
     loadAll();
+    refreshTelegramBadge();
     if (!window.__klinyxPoll) {
       window.__klinyxPoll = setInterval(loadAll, POLL_MS);
     }
   }
+
+  /* ============ telegram ============ */
+  function refreshTelegramBadge() {
+    api("GET", "/api/telegram/me").then(function (info) {
+      state.telegram = info;
+      var badge = document.getElementById("btn-telegram");
+      var text = document.getElementById("tg-badge-text");
+      badge.classList.toggle("linked", !!info.linked);
+      text.textContent = "Telegram: " + (info.linked ? "підключено" : "не підключено");
+    }).catch(function () { /* not critical — leave the default label */ });
+  }
+
+  function openTelegramModal() {
+    var root = document.getElementById("modal-root");
+    var info = state.telegram || {};
+    root.innerHTML =
+      '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
+        '<div class="modal-head"><h3>Сповіщення в Telegram</h3>' +
+          '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+        '<div class="modal-body" id="tg-modal-body"><p class="auth-sub">Завантаження...</p></div>' +
+        '<div class="modal-foot"><span></span><span></span></div>' +
+      '</div></div>';
+    document.getElementById("ov-close").addEventListener("click", closeOverlay);
+    document.getElementById("ov-backdrop").addEventListener("click", function (e) { if (e.target.id === "ov-backdrop") closeOverlay(); });
+
+    api("GET", "/api/telegram/me").then(function (data) {
+      state.telegram = data;
+      renderTelegramModalBody(data);
+    }).catch(function (err) { toast(err.message, true); closeOverlay(); });
+  }
+
+  function renderTelegramModalBody(info) {
+    var body = document.getElementById("tg-modal-body");
+    if (!body) return;
+    if (!info.configured) {
+      body.innerHTML = '<p class="auth-sub">Telegram-бот ще не налаштований адміністратором сервера. Зверніться до того, хто розгортав CRM.</p>';
+      return;
+    }
+    if (info.linked) {
+      body.innerHTML =
+        '<p class="auth-sub" style="color:var(--success);">✅ Ваш акаунт під\'єднано — сповіщення про призначені завдання приходитимуть у Telegram.</p>' +
+        '<button class="btn btn-sm" id="tg-relink">Під\'єднати інший Telegram / переприв\'язати</button>';
+    } else {
+      body.innerHTML =
+        '<p class="auth-sub">Натисніть кнопку нижче — відкриється Telegram і бот сам вас під\'єднає.</p>' +
+        (info.deepLink ? '<a class="btn btn-primary btn-block" href="' + info.deepLink + '" target="_blank" rel="noopener">Під\'єднати Telegram</a>' : '') +
+        '<p class="auth-sub" style="margin-top:14px;">Або вручну: напишіть боту' + (info.botUsername ? ' <b>@' + escapeHtml(info.botUsername) + '</b>' : '') + ' команду:</p>' +
+        '<div class="kv-row"><div class="v mono" style="font-size:18px;">/start ' + escapeHtml(info.linkCode || "") + '</div></div>' +
+        '<button class="btn btn-sm" id="tg-regen" style="margin-top:12px;">Новий код</button>';
+    }
+    var relink = document.getElementById("tg-relink");
+    if (relink) relink.addEventListener("click", function () { regenerateTelegramCode(); });
+    var regen = document.getElementById("tg-regen");
+    if (regen) regen.addEventListener("click", function () { regenerateTelegramCode(); });
+  }
+
+  function regenerateTelegramCode() {
+    api("POST", "/api/telegram/regenerate").then(function () {
+      return api("GET", "/api/telegram/me");
+    }).then(function (data) {
+      state.telegram = data;
+      renderTelegramModalBody(data);
+      toast("Новий код згенеровано");
+    }).catch(function (err) { toast(err.message, true); });
+  }
+
+  document.getElementById("btn-telegram").addEventListener("click", openTelegramModal);
 
   document.getElementById("setup-form").addEventListener("submit", function (e) {
     e.preventDefault();
@@ -171,12 +241,14 @@
       api("GET", "/api/clients"),
       api("GET", "/api/jobs"),
       api("GET", "/api/invoices"),
-      state.me && state.me.role === "admin" ? api("GET", "/api/users") : Promise.resolve(null)
+      state.me && state.me.role === "admin" ? api("GET", "/api/users") : Promise.resolve(null),
+      api("GET", "/api/users/roster")
     ]).then(function (res) {
       state.clients = new Map(res[0].map(function (c) { return [c.id, c]; }));
       state.jobs = new Map(res[1].map(function (j) { return [j.id, j]; }));
       state.invoices = new Map(res[2].map(function (i) { return [i.id, i]; }));
       if (res[3]) state.users = res[3];
+      state.roster = res[4] || [];
       render();
     }).catch(function (err) {
       if (err && err.code !== "not_authenticated") toast(err.message || "Не вдалося оновити дані", true);
@@ -290,6 +362,12 @@
     });
   }
 
+  function assigneeName(id) {
+    if (!id) return "";
+    var u = state.roster.find(function (x) { return x.id === id; });
+    return u ? u.name : "";
+  }
+
   function renderAgenda() {
     var listEl = document.getElementById("agenda-list");
     var titleEl = document.getElementById("agenda-title");
@@ -311,7 +389,7 @@
       return '<div class="agenda-item clickable" data-job="' + j.id + '" style="cursor:pointer;">' +
         '<div class="agenda-date">' + fmtDateHuman(j.date) + (j.time ? '<b>' + j.time + '</b>' : "") + '</div>' +
         '<div class="agenda-main"><div class="title">' + escapeHtml(clientName(j.clientId)) + '</div>' +
-        '<div class="meta">' + escapeHtml(j.service || "") + (j.address ? " · " + escapeHtml(j.address) : "") + '</div></div>' +
+        '<div class="meta">' + escapeHtml(j.service || "") + (j.address ? " · " + escapeHtml(j.address) : "") + (assigneeName(j.assignedTo) ? " · 👤 " + escapeHtml(assigneeName(j.assignedTo)) : "") + '</div></div>' +
         '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span></div>';
     }).join("");
     listEl.querySelectorAll("[data-job]").forEach(function (el) {
@@ -437,6 +515,7 @@
         '<td class="mono">' + escapeHtml(u.username) + '</td>' +
         '<td><span class="pill ' + u.role + '"><span class="pill-dot"></span>' + (u.role === "admin" ? "адмін" : "співробітник") + '</span></td>' +
         '<td><span class="pill ' + (u.active ? "active" : "inactive") + '"><span class="pill-dot"></span>' + (u.active ? "активний" : "вимкнено") + '</span></td>' +
+        '<td>' + (u.telegramLinked ? '<span class="pill active"><span class="pill-dot"></span>підключено</span>' : '<span class="pill lead"><span class="pill-dot"></span>—</span>') + '</td>' +
         '<td><div class="row-actions">' +
           '<button class="btn btn-sm" data-reset-pw="' + u.id + '">Скинути пароль</button>' +
           '<button class="btn btn-sm btn-ghost" data-toggle-active="' + u.id + '">' + (u.active ? "Вимкнути" : "Увімкнути") + '</button>' +
@@ -565,7 +644,7 @@
     var j = id ? state.jobs.get(id) : {
       clientId: presets.clientId || (clientsList()[0] && clientsList()[0].id) || "",
       date: presets.date || state.selectedDay || todayStr(),
-      time: "10:00", service: SERVICE_TYPES[0], address: "", price: "", status: "scheduled", notes: ""
+      time: "10:00", service: SERVICE_TYPES[0], address: "", price: "", status: "scheduled", notes: "", assignedTo: null
     };
     var root = document.getElementById("modal-root");
     root.innerHTML =
@@ -584,6 +663,9 @@
             '<div class="field"><label>Вартість, €</label><input type="number" id="f-price" value="' + escapeHtml(j.price) + '" min="0" step="1"></div>' +
             '<div class="field"><label>Статус</label><select id="f-status">' +
               ["scheduled", "done", "cancelled"].map(function (s) { return '<option value="' + s + '"' + (j.status === s ? " selected" : "") + '>' + statusLabelJob(s) + '</option>'; }).join("") + '</select></div></div>' +
+          '<div class="field"><label>Виконавець</label><select id="f-assignee"><option value="">— не призначено —</option>' +
+            state.roster.map(function (u) { return '<option value="' + u.id + '"' + (j.assignedTo === u.id ? " selected" : "") + '>' + escapeHtml(u.name) + (u.role === "admin" ? " (адмін)" : "") + '</option>'; }).join("") +
+          '</select></div>' +
           '<div class="field"><label>Нотатки</label><textarea id="f-notes">' + escapeHtml(j.notes) + '</textarea></div>' +
         '</div>' +
         '<div class="modal-foot">' + (id ? '<button class="btn btn-danger-text" id="ov-delete">Видалити</button>' : '<span></span>') +
@@ -602,7 +684,8 @@
         address: document.getElementById("f-address").value.trim(),
         price: document.getElementById("f-price").value ? Number(document.getElementById("f-price").value) : null,
         status: document.getElementById("f-status").value,
-        notes: document.getElementById("f-notes").value.trim()
+        notes: document.getElementById("f-notes").value.trim(),
+        assignedTo: document.getElementById("f-assignee").value || null
       };
       var req = id ? api("PATCH", "/api/jobs/" + id, data) : api("POST", "/api/jobs", data);
       req.then(function () { toast(id ? "Завдання оновлено" : "Завдання заплановано"); closeOverlay(); loadAll(); })
