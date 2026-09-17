@@ -792,8 +792,13 @@
 
     tbody.innerHTML = list.map(function (it) {
       var stockPill = '<span class="pill ' + (it.low ? "overdue" : "active") + '"><span class="pill-dot"></span>' + Number(it.quantity) + " " + escapeHtml(it.unit) + '</span>';
+      var thumb = it.photo
+        ? '<img src="' + it.photo + '" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex-shrink:0;">'
+        : '<div style="width:34px;height:34px;border-radius:8px;background:var(--surface-3);flex-shrink:0;"></div>';
       return '<tr class="clickable" data-item="' + it.id + '">' +
-        '<td class="cell-title">' + escapeHtml(it.name) + '</td>' +
+        '<td><div style="display:flex;align-items:center;gap:10px;">' + thumb +
+          '<div><div class="cell-title" style="margin:0;">' + escapeHtml(it.name) + '</div>' +
+          (it.code ? '<div class="cell-sub">№ ' + escapeHtml(it.code) + '</div>' : '') + '</div></div></td>' +
         '<td>' + stockPill + '</td>' +
         '<td class="cell-sub">' + Number(it.minQuantity || 0) + ' ' + escapeHtml(it.unit) + '</td>' +
         '<td><div class="row-actions">' +
@@ -823,8 +828,36 @@
   }
 
   /* ============ modal: inventory item (create/edit) ============ */
+  // Photos are stored as compressed data: URLs right on the item record (no
+  // separate file/blob storage in this app), so we resize+recompress client
+  // side before ever sending anything — keeps records small regardless of
+  // the original photo's size.
+  function resizeImageFile(file, maxDim, quality, cb) {
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var img = new Image();
+      img.onload = function () {
+        var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        var cw = Math.max(1, Math.round(img.width * scale));
+        var ch = Math.max(1, Math.round(img.height * scale));
+        var canvas = document.createElement("canvas");
+        canvas.width = cw; canvas.height = ch;
+        canvas.getContext("2d").drawImage(img, 0, 0, cw, ch);
+        cb(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = function () { toast("Не вдалося прочитати зображення", true); };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function photoPreviewHtml(photo) {
+    return photo ? '<img id="photo-preview" src="' + photo + '" style="width:80px;height:80px;border-radius:10px;object-fit:cover;">' : '';
+  }
+
   function openInventoryItemModal(id) {
-    var it = id ? state.inventory.get(id) : { name: "", unit: "л", quantity: 0, minQuantity: 0 };
+    var it = id ? state.inventory.get(id) : { name: "", unit: "л", quantity: 0, minQuantity: 0, code: "", photo: null };
+    var photoValue = it.photo || null;
     var root = document.getElementById("modal-root");
     root.innerHTML =
       '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
@@ -839,19 +872,44 @@
             (id ? '' : '<div class="field"><label>Початковий залишок</label><input type="number" id="f-qty" value="' + it.quantity + '" min="0" step="0.1"></div>') +
           '</div>' +
           '<div class="field"><label>Мінімальний залишок (поріг попередження)</label><input type="number" id="f-min" value="' + (it.minQuantity || 0) + '" min="0" step="0.1"></div>' +
+          '<div class="field"><label>Інвентарний номер</label><input type="text" id="f-code" value="' + escapeHtml(it.code || "") + '" placeholder="Напр. INV-001"></div>' +
+          '<div class="field"><label>Фото товару</label>' +
+            '<div id="photo-preview-wrap" style="margin-bottom:8px;">' + photoPreviewHtml(photoValue) + '</div>' +
+            '<input type="file" id="f-photo" accept="image/*">' +
+            '<button type="button" class="btn btn-sm btn-ghost" id="photo-remove" style="margin-top:6px;' + (photoValue ? '' : 'display:none;') + '">Видалити фото</button>' +
+          '</div>' +
         '</div>' +
         '<div class="modal-foot">' + (id ? '<button class="btn btn-danger-text" id="ov-delete">Видалити</button>' : '<span></span>') +
           '<button class="btn btn-primary" id="ov-save">Зберегти</button></div></div></div>';
 
     document.getElementById("ov-close").addEventListener("click", closeOverlay);
     document.getElementById("ov-backdrop").addEventListener("click", function (e) { if (e.target.id === "ov-backdrop") closeOverlay(); });
+
+    document.getElementById("f-photo").addEventListener("change", function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      resizeImageFile(file, 640, 0.72, function (dataUrl) {
+        photoValue = dataUrl;
+        document.getElementById("photo-preview-wrap").innerHTML = photoPreviewHtml(photoValue);
+        document.getElementById("photo-remove").style.display = "";
+      });
+    });
+    document.getElementById("photo-remove").addEventListener("click", function () {
+      photoValue = null;
+      document.getElementById("f-photo").value = "";
+      document.getElementById("photo-preview-wrap").innerHTML = "";
+      document.getElementById("photo-remove").style.display = "none";
+    });
+
     document.getElementById("ov-save").addEventListener("click", function () {
       var name = document.getElementById("f-name").value.trim();
       if (!name) { toast("Вкажіть назву товару", true); return; }
       var data = {
         name: name,
         unit: document.getElementById("f-unit").value,
-        minQuantity: document.getElementById("f-min").value ? Number(document.getElementById("f-min").value) : 0
+        minQuantity: document.getElementById("f-min").value ? Number(document.getElementById("f-min").value) : 0,
+        code: document.getElementById("f-code").value.trim(),
+        photo: photoValue
       };
       if (!id) data.quantity = document.getElementById("f-qty").value ? Number(document.getElementById("f-qty").value) : 0;
       var req = id ? api("PATCH", "/api/inventory/" + id, data) : api("POST", "/api/inventory", data);
@@ -922,7 +980,10 @@
         '<div class="drawer-head"><div><h3>' + escapeHtml(it.name) + '</h3><span class="pill ' + (it.low ? "overdue" : "active") + '" style="margin-top:6px;"><span class="pill-dot"></span>' + Number(it.quantity) + ' ' + escapeHtml(it.unit) + '</span></div>' +
           '<button class="icon-btn" id="dr-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
         '<div class="drawer-body">' +
-          '<div class="drawer-section"><h4>Інформація</h4><div class="kv">' +
+          '<div class="drawer-section"><h4>Інформація</h4>' +
+            (it.photo ? '<img src="' + it.photo + '" alt="" style="width:100%;max-width:220px;border-radius:12px;object-fit:cover;display:block;margin-bottom:12px;">' : '') +
+            '<div class="kv">' +
+            (it.code ? '<div class="kv-row"><div class="k">Інв. номер</div><div class="v">' + escapeHtml(it.code) + '</div></div>' : '') +
             '<div class="kv-row"><div class="k">Залишок</div><div class="v">' + Number(it.quantity) + ' ' + escapeHtml(it.unit) + '</div></div>' +
             '<div class="kv-row"><div class="k">Мінімальний залишок</div><div class="v">' + Number(it.minQuantity || 0) + ' ' + escapeHtml(it.unit) + '</div></div></div></div>' +
           '<div class="drawer-section"><h4>Історія</h4><div id="inv-log-list"><div class="empty-note">Завантаження...</div></div></div>' +
