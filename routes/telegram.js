@@ -61,12 +61,13 @@ module.exports = function registerTelegramRoutes(router) {
   // reach api.telegram.org even when the operator's own tools can't). Call
   // it once after deploying with TELEGRAM_BOT_TOKEN set, or again any time
   // the public URL changes.
-  router.post("/api/telegram/setup-webhook", async (req, res) => {
+  async function handleSetupWebhook(req, res) {
     // Gated by the same webhook secret rather than a login session, since
-    // this is meant to be callable once right after deploy (e.g. via curl)
-    // before anyone has necessarily logged in yet.
+    // this is meant to be callable once right after deploy (e.g. via curl,
+    // or a plain browser/GET request with ?token=...) before anyone has
+    // necessarily logged in yet.
     const expectedSetup = process.env.TELEGRAM_WEBHOOK_SECRET;
-    const gotSetup = req.headers["x-setup-token"];
+    const gotSetup = req.headers["x-setup-token"] || (req.query && req.query.token);
     if (!expectedSetup || !timingSafeEqualStr(gotSetup, expectedSetup)) {
       sendJson(res, 401, { error: "invalid_setup_token" });
       return;
@@ -86,7 +87,10 @@ module.exports = function registerTelegramRoutes(router) {
       secretConfigured: !!process.env.TELEGRAM_WEBHOOK_SECRET,
       botUsername: me ? me.username : null
     });
-  });
+  }
+
+  router.post("/api/telegram/setup-webhook", handleSetupWebhook);
+  router.get("/api/telegram/setup-webhook", handleSetupWebhook);
 
   // POST /api/telegram/webhook — called by Telegram itself, not the CRM's
   // own frontend, so there's no session cookie to check. Instead we verify
