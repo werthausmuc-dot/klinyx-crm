@@ -55,6 +55,39 @@ module.exports = function registerTelegramRoutes(router) {
     sendJson(res, 200, { linkCode: updated.telegramLinkCode });
   });
 
+  // POST /api/telegram/setup-webhook — admin-only, one-off convenience so
+  // the webhook can be (re)registered with Telegram without SSH/CLI access
+  // to wherever this app is hosted (this host's own outbound network can
+  // reach api.telegram.org even when the operator's own tools can't). Call
+  // it once after deploying with TELEGRAM_BOT_TOKEN set, or again any time
+  // the public URL changes.
+  router.post("/api/telegram/setup-webhook", async (req, res) => {
+    // Gated by the same webhook secret rather than a login session, since
+    // this is meant to be callable once right after deploy (e.g. via curl)
+    // before anyone has necessarily logged in yet.
+    const expectedSetup = process.env.TELEGRAM_WEBHOOK_SECRET;
+    const gotSetup = req.headers["x-setup-token"];
+    if (!expectedSetup || !timingSafeEqualStr(gotSetup, expectedSetup)) {
+      sendJson(res, 401, { error: "invalid_setup_token" });
+      return;
+    }
+    if (!telegram.isConfigured()) {
+      sendJson(res, 400, { error: "telegram_not_configured" });
+      return;
+    }
+    const proto = req.headers["x-forwarded-proto"] || "https";
+    const host = req.headers["x-forwarded-host"] || req.headers.host;
+    const webhookUrl = proto + "://" + host + "/api/telegram/webhook";
+    const result = await telegram.setWebhook(webhookUrl, process.env.TELEGRAM_WEBHOOK_SECRET);
+    const me = await telegram.getMe();
+    sendJson(res, 200, {
+      ok: !!result,
+      webhookUrl,
+      secretConfigured: !!process.env.TELEGRAM_WEBHOOK_SECRET,
+      botUsername: me ? me.username : null
+    });
+  });
+
   // POST /api/telegram/webhook — called by Telegram itself, not the CRM's
   // own frontend, so there's no session cookie to check. Instead we verify
   // the secret token Telegram echoes back on every webhook call (set via
