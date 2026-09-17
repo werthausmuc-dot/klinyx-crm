@@ -1,6 +1,6 @@
 const store = require("../lib/store");
 const sessions = require("../lib/sessions");
-const { hashPassword, verifyPassword, sanitizeUser, isLocked, recordFailure, recordSuccess } = require("../lib/auth");
+const { hashPassword, verifyPassword, sanitizeUser, generateTelegramLinkCode, isLocked, recordFailure, recordSuccess } = require("../lib/auth");
 const { sendJson, readJsonBody, parseCookies } = require("../lib/http-utils");
 const { setSessionCookie, clearSessionCookie, getSessionIdFromRequest } = require("../lib/session-cookie");
 
@@ -26,7 +26,9 @@ module.exports = function registerAuthRoutes(router) {
       passwordHash: hashPassword(String(password)),
       name: String(name || username).trim(),
       role: "admin",
-      active: true
+      active: true,
+      telegramChatId: null,
+      telegramLinkCode: generateTelegramLinkCode()
     });
     const sid = sessions.createSession(user.id);
     setSessionCookie(res, sid);

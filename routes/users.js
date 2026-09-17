@@ -1,9 +1,21 @@
 const store = require("../lib/store");
-const { hashPassword, sanitizeUser, requireAdmin } = require("../lib/auth");
+const { hashPassword, sanitizeUser, generateTelegramLinkCode, requireAuth, requireAdmin } = require("../lib/auth");
 const { sendJson, readJsonBody } = require("../lib/http-utils");
 
 module.exports = function registerUserRoutes(router) {
-  // Every route here is admin-only: employees don't manage other accounts.
+  // GET /api/users/roster — any authenticated user (not just admins) can
+  // see the list of active teammates, so everyone can pick who a job is
+  // assigned to. Deliberately minimal: no username, no Telegram status.
+  router.get("/api/users/roster", async (req, res) => {
+    if (!requireAuth(req, res)) return;
+    const users = await store.list("users");
+    const roster = users
+      .filter((u) => u.active !== false)
+      .map((u) => ({ id: u.id, name: u.name, role: u.role }));
+    sendJson(res, 200, roster);
+  });
+
+  // Every route below is admin-only: employees don't manage other accounts.
 
   router.get("/api/users", async (req, res) => {
     if (!requireAdmin(req, res)) return;
@@ -25,7 +37,9 @@ module.exports = function registerUserRoutes(router) {
       passwordHash: hashPassword(String(password)),
       name: String(name || username).trim(),
       role: role === "admin" ? "admin" : "employee",
-      active: true
+      active: true,
+      telegramChatId: null,
+      telegramLinkCode: generateTelegramLinkCode()
     });
     sendJson(res, 201, sanitizeUser(user));
   });

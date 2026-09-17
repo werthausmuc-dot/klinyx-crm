@@ -1,6 +1,7 @@
 const store = require("../lib/store");
 const { requireAuth } = require("../lib/auth");
 const { sendJson, readJsonBody } = require("../lib/http-utils");
+const notify = require("../lib/notify");
 
 const STATUSES = ["scheduled", "done", "cancelled"];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -18,6 +19,7 @@ function clean(body, existing) {
   if (typeof body.notes === "string") data.notes = body.notes.trim();
   if (STATUSES.includes(body.status)) data.status = body.status;
   if (!existing && !data.status) data.status = "scheduled";
+  if (typeof body.assignedTo === "string" || body.assignedTo === null) data.assignedTo = body.assignedTo || null;
   return data;
 }
 
@@ -35,7 +37,9 @@ module.exports = function registerJobRoutes(router) {
     if (!(await store.get("clients", data.clientId))) return sendJson(res, 400, { error: "invalid_input", message: "Клієнта не знайдено." });
     if (!data.date) return sendJson(res, 400, { error: "invalid_input", message: "Вкажіть дату у форматі РРРР-ММ-ДД." });
     data.createdBy = req.user.id;
-    sendJson(res, 201, await store.create("jobs", data));
+    const created = await store.create("jobs", data);
+    sendJson(res, 201, created);
+    notify.onJobCreated(created, req.user);
   });
 
   router.patch("/api/jobs/:id", async (req, res, params) => {
@@ -47,7 +51,9 @@ module.exports = function registerJobRoutes(router) {
     if (patch.clientId && !(await store.get("clients", patch.clientId))) {
       return sendJson(res, 400, { error: "invalid_input", message: "Клієнта не знайдено." });
     }
-    sendJson(res, 200, await store.update("jobs", params.id, patch));
+    const updated = await store.update("jobs", params.id, patch);
+    sendJson(res, 200, updated);
+    if ("assignedTo" in patch) notify.onJobAssigned(updated, existing.assignedTo || null);
   });
 
   router.delete("/api/jobs/:id", async (req, res, params) => {
