@@ -327,4 +327,12 @@ select {
   .nav-item { padding: 12px 10px; font-size: 14px; }
   .btn { padding: 10px 15px; }
   .btn-sm { padding: 9px 12px; }
+
+  /* iOS Safari auto-zooms the whole page when focusing a form control
+     whose font-size is under 16px — keeping every field at 16px here
+     stops that (the fixed viewport above blocks it too, belt and braces). */
+  input[type="text"], input[type="tel"], input[type="email"], input[type="number"],
+  input[type="date"], input[type="time"], input[type="password"], select, textarea {
+    font-size: 16px;
+  }
 }
