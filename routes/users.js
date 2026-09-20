@@ -5,13 +5,15 @@ const { sendJson, readJsonBody } = require("../lib/http-utils");
 module.exports = function registerUserRoutes(router) {
   // GET /api/users/roster — any authenticated user (not just admins) can
   // see the list of active teammates, so everyone can pick who a job is
-  // assigned to. Deliberately minimal: no username, no Telegram status.
+  // assigned to. Deliberately minimal: no username. telegramLinked is
+  // included so whoever assigns a job can see whether the person will
+  // actually receive the Telegram notification for it.
   router.get("/api/users/roster", async (req, res) => {
     if (!requireAuth(req, res)) return;
     const users = await store.list("users");
     const roster = users
       .filter((u) => u.active !== false)
-      .map((u) => ({ id: u.id, name: u.name, role: u.role }));
+      .map((u) => ({ id: u.id, name: u.name, role: u.role, telegramLinked: !!u.telegramChatId }));
     sendJson(res, 200, roster);
   });
 
