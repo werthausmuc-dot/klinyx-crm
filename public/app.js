@@ -694,8 +694,12 @@
             '<div class="field"><label>Статус</label><select id="f-status">' +
               ["scheduled", "done", "cancelled"].map(function (s) { return '<option value="' + s + '"' + (j.status === s ? " selected" : "") + '>' + statusLabelJob(s) + '</option>'; }).join("") + '</select></div></div>' +
           '<div class="field"><label>Виконавець</label><select id="f-assignee"><option value="">— не призначено —</option>' +
-            state.roster.map(function (u) { return '<option value="' + u.id + '"' + (j.assignedTo === u.id ? " selected" : "") + '>' + escapeHtml(u.name) + (u.role === "admin" ? " (адмін)" : "") + '</option>'; }).join("") +
-          '</select></div>' +
+            state.roster.map(function (u) {
+              var tag = (u.role === "admin" ? " (адмін)" : "") + (u.telegramLinked ? " · Telegram ✓" : " · без Telegram");
+              return '<option value="' + u.id + '"' + (j.assignedTo === u.id ? " selected" : "") + '>' + escapeHtml(u.name) + tag + '</option>';
+            }).join("") +
+          '</select>' +
+          '<p class="auth-sub" style="margin-top:6px;">"· без Telegram" — сповіщення про призначення не дійде, доки людина не під\'єднає бота.</p></div>' +
           '<div class="field"><label>Нотатки</label><textarea id="f-notes">' + escapeHtml(j.notes) + '</textarea></div>' +
         '</div>' +
         '<div class="modal-foot">' + (id ? '<button class="btn btn-danger-text" id="ov-delete">Видалити</button>' : '<span></span>') +
