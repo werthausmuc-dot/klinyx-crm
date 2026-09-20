@@ -40,6 +40,18 @@
   function pad2(n) { return n < 10 ? "0" + n : "" + n; }
   function fmtDate(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
   function parseDate(s) { var p = s.split("-"); return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)); }
+  function weekRange(d) {
+    var day = d.getDay();
+    var diffToMonday = day === 0 ? -6 : 1 - day;
+    var monday = new Date(d); monday.setDate(d.getDate() + diffToMonday);
+    var sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+    return { start: fmtDate(monday), end: fmtDate(sunday) };
+  }
+  function monthRange(d) {
+    var first = new Date(d.getFullYear(), d.getMonth(), 1);
+    var last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return { start: fmtDate(first), end: fmtDate(last) };
+  }
   function fmtDateHuman(s) {
     if (!s) return "—";
     var d = parseDate(s);
@@ -321,6 +333,15 @@
     document.getElementById("stat-today").textContent = todayJobs.length;
     document.getElementById("stat-unpaid").textContent = fmtMoney(unpaidSum);
 
+    var wr = weekRange(today), mr = monthRange(today);
+    var weekJobsF = jobs.filter(function (j) { return j.status !== "cancelled" && j.date >= wr.start && j.date <= wr.end; });
+    var monthJobsF = jobs.filter(function (j) { return j.status !== "cancelled" && j.date >= mr.start && j.date <= mr.end; });
+    function sumPrice(list) { return list.reduce(function (s, j) { return s + (Number(j.price) || 0); }, 0); }
+    var weekTotal = sumPrice(weekJobsF), weekPaid = sumPrice(weekJobsF.filter(function (j) { return j.paid; }));
+    var monthTotal = sumPrice(monthJobsF), monthPaid = sumPrice(monthJobsF.filter(function (j) { return j.paid; }));
+    document.getElementById("fin-week").textContent = fmtMoney(weekTotal) + " (оплачено " + fmtMoney(weekPaid) + ")";
+    document.getElementById("fin-month").textContent = fmtMoney(monthTotal) + " (оплачено " + fmtMoney(monthPaid) + ")";
+
     renderCalendar();
     renderAgenda();
     renderReminders();
@@ -399,11 +420,15 @@
       return;
     }
     listEl.innerHTML = items.map(function (j) {
+      var repeatIcon = j.seriesId ? '🔁 ' : '';
       return '<div class="agenda-item clickable" data-job="' + j.id + '" style="cursor:pointer;">' +
         '<div class="agenda-date">' + fmtDateHuman(j.date) + (j.time ? '<b>' + j.time + '</b>' : "") + '</div>' +
-        '<div class="agenda-main"><div class="title">' + escapeHtml(clientName(j.clientId)) + '</div>' +
+        '<div class="agenda-main"><div class="title">' + repeatIcon + escapeHtml(clientName(j.clientId)) + '</div>' +
         '<div class="meta">' + escapeHtml(j.service || "") + (j.address ? " · " + escapeHtml(j.address) : "") + (assigneeName(j.assignedTo) ? " · 👤 " + escapeHtml(assigneeName(j.assignedTo)) : "") + '</div></div>' +
-        '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span></div>';
+        '<div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">' +
+          '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span>' +
+          '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? "оплачено" : "не оплачено") + '</span>' +
+        '</div></div>';
     }).join("");
     listEl.querySelectorAll("[data-job]").forEach(function (el) {
       el.addEventListener("click", function () { openJobModal(el.getAttribute("data-job")); });
@@ -652,7 +677,12 @@
           (c.notes ? '<div class="drawer-section"><h4>Нотатки</h4><div style="font-size:13px;">' + escapeHtml(c.notes) + '</div></div>' : '') +
           '<div class="drawer-section"><h4 style="display:flex; justify-content:space-between; align-items:center;">Завдання <button class="btn btn-sm" id="dr-add-job">+ Додати</button></h4>' +
             (history.length ? history.map(function (j) {
-              return '<div class="job-row"><div class="agenda-date">' + fmtDateHuman(j.date) + '</div><div class="agenda-main"><div class="title">' + escapeHtml(j.service || "") + '</div></div><span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span></div>';
+              var repeatIcon = j.seriesId ? '🔁 ' : '';
+              return '<div class="job-row"><div class="agenda-date">' + fmtDateHuman(j.date) + '</div><div class="agenda-main"><div class="title">' + repeatIcon + escapeHtml(j.service || "") + '</div></div>' +
+                '<div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">' +
+                  '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span>' +
+                  '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? "оплачено" : "не оплачено") + '</span>' +
+                '</div></div>';
             }).join("") : '<div class="empty-note">Ще немає завдань</div>') + '</div>' +
           '<div class="drawer-section"><h4 style="display:flex; justify-content:space-between; align-items:center;">Рахунки <button class="btn btn-sm" id="dr-add-invoice">+ Додати</button></h4>' +
             (invs.length ? invs.map(function (i) {
@@ -674,7 +704,8 @@
     var j = id ? state.jobs.get(id) : {
       clientId: presets.clientId || (clientsList()[0] && clientsList()[0].id) || "",
       date: presets.date || state.selectedDay || todayStr(),
-      time: "10:00", service: SERVICE_TYPES[0], address: "", price: "", status: "scheduled", notes: "", assignedTo: null
+      time: "10:00", service: SERVICE_TYPES[0], address: "", price: "", status: "scheduled", notes: "", assignedTo: null,
+      paid: false, recurrence: null
     };
     var root = document.getElementById("modal-root");
     root.innerHTML =
@@ -700,6 +731,23 @@
             }).join("") +
           '</select>' +
           '<p class="auth-sub" style="margin-top:6px;">"· без Telegram" — сповіщення про призначення не дійде, доки людина не під\'єднає бота.</p></div>' +
+          '<div class="field-row">' +
+            '<div class="field"><label>Оплата</label><select id="f-paid">' +
+              '<option value="false"' + (!j.paid ? " selected" : "") + '>не оплачено</option>' +
+              '<option value="true"' + (j.paid ? " selected" : "") + '>оплачено</option>' +
+            '</select></div>' +
+            '<div class="field"><label>Повторення</label><select id="f-recur-freq">' +
+              '<option value="">не повторюється</option>' +
+              '<option value="weekly"' + (j.recurrence && j.recurrence.freq === "weekly" ? " selected" : "") + '>щотижня</option>' +
+              '<option value="biweekly"' + (j.recurrence && j.recurrence.freq === "biweekly" ? " selected" : "") + '>що 2 тижні</option>' +
+              '<option value="monthly"' + (j.recurrence && j.recurrence.freq === "monthly" ? " selected" : "") + '>щомісяця</option>' +
+            '</select></div>' +
+          '</div>' +
+          '<div class="field" id="f-recur-until-wrap" style="' + (j.recurrence ? '' : 'display:none;') + '">' +
+            '<label>Повторювати до (необов\'язково)</label>' +
+            '<input type="date" id="f-recur-until" value="' + ((j.recurrence && j.recurrence.until) || "") + '">' +
+            '<p class="auth-sub" style="margin-top:6px;">Наступні дати з\'являться автоматично (наперед приблизно на 2 місяці). Про кожну згенеровану дату Telegram-сповіщення не надсилається — тільки про перше створене завдання.</p>' +
+          '</div>' +
           '<div class="field"><label>Нотатки</label><textarea id="f-notes">' + escapeHtml(j.notes) + '</textarea></div>' +
         '</div>' +
         '<div class="modal-foot">' + (id ? '<button class="btn btn-danger-text" id="ov-delete">Видалити</button>' : '<span></span>') +
@@ -719,8 +767,11 @@
         price: document.getElementById("f-price").value ? Number(document.getElementById("f-price").value) : null,
         status: document.getElementById("f-status").value,
         notes: document.getElementById("f-notes").value.trim(),
-        assignedTo: document.getElementById("f-assignee").value || null
+        assignedTo: document.getElementById("f-assignee").value || null,
+        paid: document.getElementById("f-paid").value === "true"
       };
+      var recurFreq = document.getElementById("f-recur-freq").value;
+      data.recurrence = recurFreq ? { freq: recurFreq, until: document.getElementById("f-recur-until").value || null } : null;
       var req = id ? api("PATCH", "/api/jobs/" + id, data) : api("POST", "/api/jobs", data);
       req.then(function () { toast(id ? "Завдання оновлено" : "Завдання заплановано"); closeOverlay(); loadAll(); })
          .catch(function (err) { toast(err.message, true); });
@@ -734,6 +785,9 @@
     document.getElementById("f-client").addEventListener("change", function (e) {
       var c = state.clients.get(e.target.value);
       if (c && c.address && !document.getElementById("f-address").value) document.getElementById("f-address").value = c.address;
+    });
+    document.getElementById("f-recur-freq").addEventListener("change", function (e) {
+      document.getElementById("f-recur-until-wrap").style.display = e.target.value ? "" : "none";
     });
   }
 
