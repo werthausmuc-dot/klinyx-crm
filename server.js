@@ -22,6 +22,7 @@ require("./routes/jobs")(router);
 require("./routes/invoices")(router);
 require("./routes/inventory")(router);
 require("./routes/telegram")(router);
+require("./routes/roadmap")(router);
 
 async function getCurrentUser(req) {
   const sid = getSessionIdFromRequest(req, parseCookies);
