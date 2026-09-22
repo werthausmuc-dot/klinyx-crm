@@ -68,6 +68,23 @@
     });
   }
 
+  // Renders free-text description line by line. A line shaped like
+  // "Назва: https://..." becomes a label plus a real clickable "Увійти →"
+  // button (e.g. platform login/registration links in the Roadmap) instead
+  // of showing the raw URL as plain text.
+  function renderDescLines(text) {
+    if (!text) return "";
+    var urlLineRe = /^(.*?):\s*(https?:\/\/\S+)\s*$/;
+    return String(text).split("\n").map(function (line) {
+      var m = line.match(urlLineRe);
+      if (m) {
+        return '<div class="roadmap-link-row"><span>' + escapeHtml(m[1].trim()) + '</span>' +
+          '<a class="btn-chip" href="' + escapeHtml(m[2]) + '" target="_blank" rel="noopener noreferrer">Увійти →</a></div>';
+      }
+      return line.trim() ? '<div>' + escapeHtml(line) + '</div>' : '<div>&nbsp;</div>';
+    }).join("");
+  }
+
   /* ============ toast ============ */
   function toast(msg, isError) {
     var host = document.getElementById("toast-host");
@@ -660,7 +677,7 @@
       host.innerHTML = list.map(function (r) {
         return '<div class="roadmap-card">' +
           '<div class="roadmap-card-title">' + escapeHtml(r.title) + '</div>' +
-          (r.description ? '<div class="roadmap-card-desc">' + escapeHtml(r.description) + '</div>' : '') +
+          (r.description ? '<div class="roadmap-card-desc">' + renderDescLines(r.description) + '</div>' : '') +
           (isAdmin ? '<div class="roadmap-card-actions">' +
             (status !== "backlog" ? '<button class="btn-chip" data-move="backlog" data-id="' + r.id + '">← заплановано</button>' : '') +
             (status !== "in_progress" ? '<button class="btn-chip" data-move="in_progress" data-id="' + r.id + '">в процесі</button>' : '') +
