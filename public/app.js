@@ -772,12 +772,24 @@
         (isAdmin ? '<button class="icon-btn widget-edit" data-edit-platform="' + p.id + '" title="Редагувати"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' : '') +
         '<div class="widget-badge" style="background:' + widgetColor(p.title) + '">' + escapeHtml(initial) + '</div>' +
         '<div class="widget-title">' + escapeHtml(p.title) + '</div>' +
-        (p.note ? '<div class="widget-note">' + escapeHtml(p.note) + '</div>' : '') +
         '<' + (isAdmin ? 'button' : 'span') + ' class="widget-status' + (p.done ? ' done' : '') + '"' +
           (isAdmin ? ' data-toggle-platform="' + p.id + '" title="Позначити ' + (p.done ? "не виконано" : "виконано") + '"' : '') + '>' +
           '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 13l4 4L19 7"/></svg>' +
           (p.done ? "Виконано" : "Не виконано") +
         '</' + (isAdmin ? 'button' : 'span') + '>' +
+        (isAdmin
+          ? '<input type="text" class="widget-personal-note" data-note-input="' + p.id + '" value="' + escapeHtml(p.note || "") + '" placeholder="Нотатка для себе...">'
+          : (p.note ? '<div class="widget-personal-note is-readonly">' + escapeHtml(p.note) + '</div>' : '')) +
+        (isAdmin
+          ? '<button class="widget-tasks-toggle" data-toggle-tasks="' + p.id + '" type="button">' + tasksToggleLabel(p) + '</button>' +
+            '<div class="widget-tasks-panel" id="widget-tasks-panel-' + p.id + '" hidden>' +
+              '<div class="platform-tasks" id="widget-tasks-list-' + p.id + '">' + renderPlatformTasks(p, "card-" + p.id + "-") + '</div>' +
+              '<div class="platform-notes-add">' +
+                '<input type="text" id="widget-new-task-' + p.id + '" placeholder="Нове завдання...">' +
+                '<button class="btn btn-sm" data-add-card-task="' + p.id + '" type="button">Додати</button>' +
+              '</div>' +
+            '</div>'
+          : '') +
         '<div class="widget-open">Відкрити <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17 17 7M9 7h8v8"/></svg></div>' +
       '</a>';
     }).join("");
@@ -800,12 +812,218 @@
         var pid = btn.getAttribute("data-toggle-platform");
         var current = state.platforms.get(pid);
         api("PATCH", "/api/platforms/" + pid, { done: !(current && current.done) })
-          .then(function () { loadAll(); })
+          .then(function (updated) {
+            state.platforms.set(pid, updated);
+            btn.classList.toggle("done", !!updated.done);
+            btn.title = "Позначити " + (updated.done ? "не виконано" : "виконано");
+            btn.closest(".widget-card").classList.toggle("is-done", !!updated.done);
+            var label = updated.done ? "Виконано" : "Не виконано";
+            btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 13l4 4L19 7"/></svg>' + label;
+          })
           .catch(function (err) { toast(err.message, true); });
       });
     });
     var addTile = document.getElementById("btn-new-order-tile");
     if (addTile) addTile.addEventListener("click", function () { openPlatformModal(null); });
+
+    // Personal status note, editable right on the tile — no need to open
+    // the edit modal. It lives inside the <a> card, so clicks/typing must
+    // not bubble up and trigger the card's own link navigation.
+    grid.querySelectorAll("[data-note-input]").forEach(function (input) {
+      input.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+      input.addEventListener("click", function (e) { e.stopPropagation(); e.preventDefault(); });
+      input.addEventListener("keydown", function (e) {
+        e.stopPropagation();
+        if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+      });
+      input.addEventListener("blur", function () {
+        var pid = input.getAttribute("data-note-input");
+        var current = state.platforms.get(pid);
+        var value = input.value.trim();
+        if (current && (current.note || "") === value) return;
+        api("PATCH", "/api/platforms/" + pid, { note: value })
+          .then(function (updated) { state.platforms.set(pid, updated); })
+          .catch(function (err) { toast(err.message, true); input.value = (current && current.note) || ""; });
+      });
+    });
+
+    // Tasks tab right on the tile — expandable, no need to open the edit
+    // modal. Same task list/history logic as the modal, just scoped to
+    // this card's own element ids so several cards can be open at once.
+    grid.querySelectorAll("[data-toggle-tasks]").forEach(function (btn) {
+      btn.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+      btn.addEventListener("click", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var pid = btn.getAttribute("data-toggle-tasks");
+        var panel = document.getElementById("widget-tasks-panel-" + pid);
+        if (panel) panel.hidden = !panel.hidden;
+      });
+    });
+    items.forEach(function (p) {
+      if (!isAdmin) return;
+      wirePlatformTasks(p.id, "widget-tasks-list-" + p.id, "card-" + p.id + "-");
+    });
+    grid.querySelectorAll(".widget-tasks-panel").forEach(function (panel) {
+      panel.addEventListener("click", function (e) { e.stopPropagation(); });
+      panel.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+    });
+    grid.querySelectorAll("[data-add-card-task]").forEach(function (btn) {
+      var pid = btn.getAttribute("data-add-card-task");
+      var input = document.getElementById("widget-new-task-" + pid);
+      var doAdd = function () {
+        if (!input) return;
+        var title = input.value.trim();
+        if (!title) return;
+        api("POST", "/api/platforms/" + pid + "/tasks", { title: title }).then(function (updated) {
+          input.value = "";
+          onPlatformTasksUpdated(pid, updated, "widget-tasks-list-" + pid, "card-" + pid + "-");
+        }).catch(function (err) { toast(err.message, true); });
+      };
+      btn.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+      btn.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); doAdd(); });
+      if (input) {
+        input.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+        input.addEventListener("click", function (e) { e.stopPropagation(); e.preventDefault(); });
+        input.addEventListener("keydown", function (e) {
+          e.stopPropagation();
+          if (e.key === "Enter") { e.preventDefault(); doAdd(); }
+        });
+      }
+    });
+  }
+
+  function renderPlatformNotes(p) {
+    var notes = Array.isArray(p.notes) ? p.notes.slice() : [];
+    if (p.note && p.note.trim()) notes.unshift({ id: "__legacy", text: p.note, createdAt: p.createdAt });
+    if (!notes.length) return '<div class="empty-note">Записів ще немає.</div>';
+    return notes.map(function (n) {
+      return '<div class="platform-note-row">' +
+        '<div class="platform-note-text">' + escapeHtml(n.text) +
+          '<span class="platform-note-meta">' + fmtDateHuman((n.createdAt || "").slice(0, 10)) + '</span></div>' +
+        '<button class="icon-btn platform-note-remove" data-remove-note="' + escapeHtml(n.id) + '" title="Видалити запис">' +
+          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
+      '</div>';
+    }).join("");
+  }
+
+  function wirePlatformNoteRemoveButtons(pid) {
+    var list = document.getElementById("platform-notes-list");
+    if (!list) return;
+    list.querySelectorAll("[data-remove-note]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var noteId = btn.getAttribute("data-remove-note");
+        var req = noteId === "__legacy"
+          ? api("PATCH", "/api/platforms/" + pid, { note: "" })
+          : api("DELETE", "/api/platforms/" + pid + "/notes/" + noteId);
+        req.then(function (updated) {
+          state.platforms.set(pid, updated);
+          list.innerHTML = renderPlatformNotes(updated);
+          wirePlatformNoteRemoveButtons(pid);
+        }).catch(function (err) { toast(err.message, true); });
+      });
+    });
+  }
+
+  function renderTaskHistory(t) {
+    var hist = Array.isArray(t.history) ? t.history.slice().reverse() : [];
+    if (!hist.length) return '<div class="empty-note">Немає історії.</div>';
+    return hist.map(function (h) {
+      var d = h.changedAt || "";
+      return '<div class="platform-task-history-row"><span>' + (h.done ? "Виконано" : "Не виконано") + '</span>' +
+        '<span class="platform-note-meta">' + fmtDateHuman(d.slice(0, 10)) + (d.length >= 16 ? " " + d.slice(11, 16) : "") + '</span></div>';
+    }).join("");
+  }
+
+  // idPrefix keeps history-panel element ids unique when the same task list
+  // is rendered in more than one place at once (the edit modal and a
+  // widget-card panel both use this, each with their own prefix).
+  function renderPlatformTasks(p, idPrefix) {
+    idPrefix = idPrefix || "task-history-";
+    var tasks = Array.isArray(p.tasks) ? p.tasks : [];
+    if (!tasks.length) return '<div class="empty-note">Завдань ще немає.</div>';
+    return tasks.map(function (t) {
+      return '<div class="platform-task-row">' +
+        '<button class="platform-task-check' + (t.done ? ' done' : '') + '" data-toggle-task="' + escapeHtml(t.id) + '" title="' + (t.done ? "Позначити не виконано" : "Позначити виконано") + '">' +
+          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></button>' +
+        '<div class="platform-task-title' + (t.done ? ' done' : '') + '">' + escapeHtml(t.title) + '</div>' +
+        '<button class="icon-btn platform-task-history" data-history-task="' + escapeHtml(t.id) + '" title="Історія статусу">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></button>' +
+        '<button class="icon-btn platform-task-remove" data-remove-task="' + escapeHtml(t.id) + '" title="Видалити завдання">' +
+          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
+        '<div class="platform-task-history-panel" id="' + idPrefix + escapeHtml(t.id) + '" hidden></div>' +
+      '</div>';
+    }).join("");
+  }
+
+  function taskCounts(p) {
+    var tasks = Array.isArray(p.tasks) ? p.tasks : [];
+    return { done: tasks.filter(function (t) { return t.done; }).length, total: tasks.length };
+  }
+
+  function wirePlatformTasks(pid, listElId, idPrefix) {
+    listElId = listElId || "platform-tasks-list";
+    idPrefix = idPrefix || "task-history-";
+    var list = document.getElementById(listElId);
+    if (!list) return;
+    function currentTask(tid) {
+      var p = state.platforms.get(pid);
+      return p && Array.isArray(p.tasks) ? p.tasks.find(function (t) { return t.id === tid; }) : null;
+    }
+    function stop(el) {
+      el.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+      el.addEventListener("click", function (e) { e.stopPropagation(); });
+    }
+    list.querySelectorAll("[data-toggle-task]").forEach(function (btn) {
+      stop(btn);
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        var tid = btn.getAttribute("data-toggle-task");
+        var task = currentTask(tid);
+        api("PATCH", "/api/platforms/" + pid + "/tasks/" + tid, { done: !(task && task.done) })
+          .then(function (updated) { onPlatformTasksUpdated(pid, updated, listElId, idPrefix); })
+          .catch(function (err) { toast(err.message, true); });
+      });
+    });
+    list.querySelectorAll("[data-remove-task]").forEach(function (btn) {
+      stop(btn);
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        var tid = btn.getAttribute("data-remove-task");
+        api("DELETE", "/api/platforms/" + pid + "/tasks/" + tid)
+          .then(function (updated) { onPlatformTasksUpdated(pid, updated, listElId, idPrefix); })
+          .catch(function (err) { toast(err.message, true); });
+      });
+    });
+    list.querySelectorAll("[data-history-task]").forEach(function (btn) {
+      stop(btn);
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        var tid = btn.getAttribute("data-history-task");
+        var panel = document.getElementById(idPrefix + tid);
+        if (!panel) return;
+        if (!panel.hidden) { panel.hidden = true; return; }
+        var task = currentTask(tid);
+        panel.innerHTML = task ? renderTaskHistory(task) : "";
+        panel.hidden = false;
+      });
+    });
+  }
+
+  function onPlatformTasksUpdated(pid, updated, listElId, idPrefix) {
+    state.platforms.set(pid, updated);
+    var list = document.getElementById(listElId);
+    if (list) {
+      list.innerHTML = renderPlatformTasks(updated, idPrefix);
+      wirePlatformTasks(pid, listElId, idPrefix);
+    }
+    var toggleBtn = document.querySelector('[data-toggle-tasks="' + pid + '"]');
+    if (toggleBtn) toggleBtn.innerHTML = tasksToggleLabel(updated);
+  }
+
+  function tasksToggleLabel(p) {
+    var c = taskCounts(p);
+    return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' +
+      ' Завдання' + (c.total ? ' (' + c.done + '/' + c.total + ')' : '');
   }
 
   function openPlatformModal(id) {
@@ -818,7 +1036,18 @@
         '<div class="modal-body">' +
           '<div class="field"><label>Назва *</label><input type="text" id="f-title" value="' + (p ? escapeHtml(p.title) : "") + '" placeholder="Напр. Helpling"></div>' +
           '<div class="field"><label>Посилання *</label><input type="text" id="f-url" value="' + (p ? escapeHtml(p.url) : "") + '" placeholder="https://..."></div>' +
-          '<div class="field"><label>Нотатка</label><input type="text" id="f-note" value="' + (p ? escapeHtml(p.note || "") : "") + '" placeholder="Коротко, навіщо (необов\'язково)"></div>' +
+          (p ?
+            '<div class="field"><label>Завдання</label>' +
+              '<div class="platform-tasks" id="platform-tasks-list">' + renderPlatformTasks(p) + '</div>' +
+              '<div class="platform-notes-add"><input type="text" id="f-new-task" placeholder="Нове завдання, напр. «Реєстрація»"><button class="btn btn-sm" id="ov-add-task" type="button">Додати</button></div>' +
+            '</div>'
+            : '') +
+          (p ?
+            '<div class="field"><label>Нотатки</label>' +
+              '<div class="platform-notes" id="platform-notes-list">' + renderPlatformNotes(p) + '</div>' +
+              '<div class="platform-notes-add"><input type="text" id="f-new-note" placeholder="Додати запис, напр. «Зареєструвався», «3 замовлення»"><button class="btn btn-sm" id="ov-add-note" type="button">Додати</button></div>' +
+            '</div>'
+            : '<div class="field"><label>Нотатка</label><input type="text" id="f-note" placeholder="Коротко, навіщо (необов\'язково)"></div>') +
           '<label class="checkbox-field"><input type="checkbox" id="f-done"' + (p && p.done ? " checked" : "") + '> Реєстрацію вже виконано</label>' +
         '</div>' +
         '<div class="modal-foot">' + (p ? '<button class="btn btn-danger-text" id="ov-delete">Видалити</button>' : '<span></span>') + '<button class="btn btn-primary" id="ov-save">Зберегти</button></div>' +
@@ -831,7 +1060,8 @@
       var url = document.getElementById("f-url").value.trim();
       if (!title) { toast("Вкажіть назву", true); return; }
       if (!url) { toast("Вкажіть посилання", true); return; }
-      var data = { title: title, url: url, note: document.getElementById("f-note").value.trim(), done: document.getElementById("f-done").checked };
+      var data = { title: title, url: url, done: document.getElementById("f-done").checked };
+      if (!p) data.note = document.getElementById("f-note").value.trim();
       var req = p ? api("PATCH", "/api/platforms/" + p.id, data) : api("POST", "/api/platforms", data);
       req.then(function () { toast(p ? "Платформу оновлено" : "Платформу додано"); closeOverlay(); loadAll(); })
         .catch(function (err) { toast(err.message, true); });
@@ -840,6 +1070,38 @@
       document.getElementById("ov-delete").addEventListener("click", function () {
         if (!confirm('Видалити віджет "' + p.title + '"?')) return;
         api("DELETE", "/api/platforms/" + p.id).then(function () { toast("Платформу видалено"); closeOverlay(); loadAll(); });
+      });
+      wirePlatformTasks(p.id);
+      var addTask = function () {
+        var input = document.getElementById("f-new-task");
+        var title = input.value.trim();
+        if (!title) return;
+        api("POST", "/api/platforms/" + p.id + "/tasks", { title: title }).then(function (updated) {
+          state.platforms.set(p.id, updated);
+          input.value = "";
+          var list = document.getElementById("platform-tasks-list");
+          if (list) { list.innerHTML = renderPlatformTasks(updated); wirePlatformTasks(p.id); }
+        }).catch(function (err) { toast(err.message, true); });
+      };
+      document.getElementById("ov-add-task").addEventListener("click", addTask);
+      document.getElementById("f-new-task").addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); addTask(); }
+      });
+      wirePlatformNoteRemoveButtons(p.id);
+      var addNote = function () {
+        var input = document.getElementById("f-new-note");
+        var text = input.value.trim();
+        if (!text) return;
+        api("POST", "/api/platforms/" + p.id + "/notes", { text: text }).then(function (updated) {
+          state.platforms.set(p.id, updated);
+          input.value = "";
+          var list = document.getElementById("platform-notes-list");
+          if (list) { list.innerHTML = renderPlatformNotes(updated); wirePlatformNoteRemoveButtons(p.id); }
+        }).catch(function (err) { toast(err.message, true); });
+      };
+      document.getElementById("ov-add-note").addEventListener("click", addNote);
+      document.getElementById("f-new-note").addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); addNote(); }
       });
     }
   }
