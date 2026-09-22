@@ -768,11 +768,16 @@
 
     var html = items.map(function (p) {
       var initial = (p.title || "?").trim().charAt(0).toUpperCase();
-      return '<a class="widget-card" href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener noreferrer">' +
+      return '<a class="widget-card' + (p.done ? ' is-done' : '') + '" href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener noreferrer">' +
         (isAdmin ? '<button class="icon-btn widget-edit" data-edit-platform="' + p.id + '" title="Редагувати"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' : '') +
         '<div class="widget-badge" style="background:' + widgetColor(p.title) + '">' + escapeHtml(initial) + '</div>' +
         '<div class="widget-title">' + escapeHtml(p.title) + '</div>' +
         (p.note ? '<div class="widget-note">' + escapeHtml(p.note) + '</div>' : '') +
+        '<' + (isAdmin ? 'button' : 'span') + ' class="widget-status' + (p.done ? ' done' : '') + '"' +
+          (isAdmin ? ' data-toggle-platform="' + p.id + '" title="Позначити ' + (p.done ? "не виконано" : "виконано") + '"' : '') + '>' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 13l4 4L19 7"/></svg>' +
+          (p.done ? "Виконано" : "Не виконано") +
+        '</' + (isAdmin ? 'button' : 'span') + '>' +
         '<div class="widget-open">Відкрити <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17 17 7M9 7h8v8"/></svg></div>' +
       '</a>';
     }).join("");
@@ -787,6 +792,16 @@
       btn.addEventListener("click", function (e) {
         e.preventDefault(); e.stopPropagation();
         openPlatformModal(btn.getAttribute("data-edit-platform"));
+      });
+    });
+    grid.querySelectorAll("[data-toggle-platform]").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var pid = btn.getAttribute("data-toggle-platform");
+        var current = state.platforms.get(pid);
+        api("PATCH", "/api/platforms/" + pid, { done: !(current && current.done) })
+          .then(function () { loadAll(); })
+          .catch(function (err) { toast(err.message, true); });
       });
     });
     var addTile = document.getElementById("btn-new-order-tile");
@@ -804,6 +819,7 @@
           '<div class="field"><label>Назва *</label><input type="text" id="f-title" value="' + (p ? escapeHtml(p.title) : "") + '" placeholder="Напр. Helpling"></div>' +
           '<div class="field"><label>Посилання *</label><input type="text" id="f-url" value="' + (p ? escapeHtml(p.url) : "") + '" placeholder="https://..."></div>' +
           '<div class="field"><label>Нотатка</label><input type="text" id="f-note" value="' + (p ? escapeHtml(p.note || "") : "") + '" placeholder="Коротко, навіщо (необов\'язково)"></div>' +
+          '<label class="checkbox-field"><input type="checkbox" id="f-done"' + (p && p.done ? " checked" : "") + '> Реєстрацію вже виконано</label>' +
         '</div>' +
         '<div class="modal-foot">' + (p ? '<button class="btn btn-danger-text" id="ov-delete">Видалити</button>' : '<span></span>') + '<button class="btn btn-primary" id="ov-save">Зберегти</button></div>' +
       '</div></div>';
@@ -815,7 +831,7 @@
       var url = document.getElementById("f-url").value.trim();
       if (!title) { toast("Вкажіть назву", true); return; }
       if (!url) { toast("Вкажіть посилання", true); return; }
-      var data = { title: title, url: url, note: document.getElementById("f-note").value.trim() };
+      var data = { title: title, url: url, note: document.getElementById("f-note").value.trim(), done: document.getElementById("f-done").checked };
       var req = p ? api("PATCH", "/api/platforms/" + p.id, data) : api("POST", "/api/platforms", data);
       req.then(function () { toast(p ? "Платформу оновлено" : "Платформу додано"); closeOverlay(); loadAll(); })
         .catch(function (err) { toast(err.message, true); });

@@ -349,6 +349,18 @@ select {
   transition: border-color .15s ease, color .15s ease;
 }
 .widget-card-add:hover { border-color: var(--accent); color: var(--accent-strong); }
+.widget-card.is-done { border-color: var(--success); }
+.widget-status {
+  display: inline-flex; align-items: center; gap: 5px; align-self: flex-start;
+  font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+  background: var(--surface-3); color: var(--text-faint); border: 1px solid var(--border);
+  font-family: inherit; cursor: default;
+}
+button.widget-status { cursor: pointer; }
+button.widget-status:hover { border-color: var(--accent); color: var(--accent-strong); }
+.widget-status.done { background: var(--success-soft); color: var(--success); border-color: transparent; }
+.checkbox-field { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); cursor: pointer; }
+.checkbox-field input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 
 @media (max-width: 880px) {
   #app { display: block; }
