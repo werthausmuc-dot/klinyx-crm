@@ -98,6 +98,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 21V4"/><path d="M5 4h13l-2.6 4.2L18 12.5H5"/></svg>
         План розвитку
       </button>
+      <button class="nav-item" data-view="orders">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Замовлення
+      </button>
     </nav>
     <div class="sidebar-footer">
       <button class="tg-badge" id="btn-telegram" type="button">
@@ -140,7 +144,7 @@
 
       <div class="stat-grid">
         <div class="stat-tile"><div class="label">Клієнтів усього</div><div class="value" id="stat-clients">0</div></div>
-        <div class="stat-tile accent"><div class="label">Завданя цього тижня</div><div class="value" id="stat-week-jobs">0</div></div>
+        <div class="stat-tile accent"><div class="label">Завдань цього тижня</div><div class="value" id="stat-week-jobs">0</div></div>
         <div class="stat-tile"><div class="label">Сьогодні заплановано</div><div class="value" id="stat-today">0</div></div>
         <div class="stat-tile warn"><div class="label">Неоплачено</div><div class="value" id="stat-unpaid">€0</div></div>
       </div>
@@ -309,6 +313,21 @@
         </div>
       </div>
       <div class="empty-note" id="roadmap-empty" hidden>Плану розвитку ще немає.</div>
+    </section>
+
+    <!-- ORDERS / PLATFORM WIDGETS -->
+    <section class="view" id="view-orders">
+      <div class="page-header">
+        <div><h1>Замовлення</h1><p class="sub">Швидкий перехід на платформи, де шукаємо замовлення</p></div>
+        <div class="header-actions" id="orders-admin-actions" hidden>
+          <button class="btn btn-primary" id="btn-new-order">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Додати платформу
+          </button>
+        </div>
+      </div>
+      <div class="widget-grid" id="orders-grid"></div>
+      <div class="empty-note" id="orders-empty" hidden>Платформ ще немає — додай першу кнопкою вище.</div>
     </section>
 
   </main>

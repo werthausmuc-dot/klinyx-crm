@@ -25,6 +25,7 @@
     invoices: new Map(),
     inventory: new Map(),
     roadmap: new Map(),
+    platforms: new Map(),
     users: [],
     roster: [],
     telegram: null,
@@ -287,7 +288,8 @@
       state.me && state.me.role === "admin" ? api("GET", "/api/users") : Promise.resolve(null),
       api("GET", "/api/users/roster"),
       state.me && state.me.role === "admin" ? api("GET", "/api/inventory") : Promise.resolve(null),
-      api("GET", "/api/roadmap")
+      api("GET", "/api/roadmap"),
+      api("GET", "/api/platforms")
     ]).then(function (res) {
       state.clients = new Map(res[0].map(function (c) { return [c.id, c]; }));
       state.jobs = new Map(res[1].map(function (j) { return [j.id, j]; }));
@@ -296,6 +298,7 @@
       state.roster = res[4] || [];
       if (res[5]) state.inventory = new Map(res[5].map(function (it) { return [it.id, it]; }));
       state.roadmap = new Map((res[6] || []).map(function (r) { return [r.id, r]; }));
+      state.platforms = new Map((res[7] || []).map(function (p) { return [p.id, p]; }));
       render();
     }).catch(function (err) {
       if (err && err.code !== "not_authenticated") toast(err.message || "Не вдалося оновити дані", true);
@@ -324,6 +327,14 @@
   function invoicesList() { return Array.from(state.invoices.values()); }
   function inventoryList() { return Array.from(state.inventory.values()); }
   function roadmapList() { return Array.from(state.roadmap.values()); }
+  function platformsList() { return Array.from(state.platforms.values()); }
+  function widgetColor(name) {
+    var palette = ["#2F9EFF", "#34D399", "#FBBF24", "#F87171", "#A78BFA", "#F472B6", "#38BDF8", "#FB923C"];
+    var s = String(name || "");
+    var h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return palette[h % palette.length];
+  }
   function clientsList() { return Array.from(state.clients.values()); }
   function isOverdue(inv) { return inv.status === "unpaid" && inv.dueDate && inv.dueDate < todayStr(); }
   function nextJobForClient(clientId) {
@@ -740,6 +751,79 @@
       document.getElementById("ov-delete").addEventListener("click", function () {
         if (!confirm('Видалити пункт "' + r.title + '" з плану розвитку?')) return;
         api("DELETE", "/api/roadmap/" + r.id).then(function () { toast("Пункт видалено"); closeOverlay(); loadAll(); });
+      });
+    }
+  }
+
+  /* ============ orders: platform quick-access widgets ============ */
+  function renderOrders() {
+    var items = platformsList().sort(function (a, b) { return (a.createdAt || "").localeCompare(b.createdAt || ""); });
+    var isAdmin = !!(state.me && state.me.role === "admin");
+    var adminActions = document.getElementById("orders-admin-actions");
+    if (adminActions) adminActions.hidden = !isAdmin;
+
+    var grid = document.getElementById("orders-grid");
+    var emptyNote = document.getElementById("orders-empty");
+    if (emptyNote) emptyNote.hidden = items.length > 0 || isAdmin;
+
+    var html = items.map(function (p) {
+      var initial = (p.title || "?").trim().charAt(0).toUpperCase();
+      return '<a class="widget-card" href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener noreferrer">' +
+        (isAdmin ? '<button class="icon-btn widget-edit" data-edit-platform="' + p.id + '" title="Редагувати"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' : '') +
+        '<div class="widget-badge" style="background:' + widgetColor(p.title) + '">' + escapeHtml(initial) + '</div>' +
+        '<div class="widget-title">' + escapeHtml(p.title) + '</div>' +
+        (p.note ? '<div class="widget-note">' + escapeHtml(p.note) + '</div>' : '') +
+        '<div class="widget-open">Відкрити <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17 17 7M9 7h8v8"/></svg></div>' +
+      '</a>';
+    }).join("");
+
+    if (isAdmin) {
+      html += '<button class="widget-card-add" id="btn-new-order-tile">' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Додати платформу</button>';
+    }
+    grid.innerHTML = html;
+
+    grid.querySelectorAll("[data-edit-platform]").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        openPlatformModal(btn.getAttribute("data-edit-platform"));
+      });
+    });
+    var addTile = document.getElementById("btn-new-order-tile");
+    if (addTile) addTile.addEventListener("click", function () { openPlatformModal(null); });
+  }
+
+  function openPlatformModal(id) {
+    var p = id ? state.platforms.get(id) : null;
+    var root = document.getElementById("modal-root");
+    root.innerHTML =
+      '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
+        '<div class="modal-head"><h3>' + (p ? "Редагувати платформу" : "Нова платформа") + '</h3>' +
+          '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+        '<div class="modal-body">' +
+          '<div class="field"><label>Назва *</label><input type="text" id="f-title" value="' + (p ? escapeHtml(p.title) : "") + '" placeholder="Напр. Helpling"></div>' +
+          '<div class="field"><label>Посилання *</label><input type="text" id="f-url" value="' + (p ? escapeHtml(p.url) : "") + '" placeholder="https://..."></div>' +
+          '<div class="field"><label>Нотатка</label><input type="text" id="f-note" value="' + (p ? escapeHtml(p.note || "") : "") + '" placeholder="Коротко, навіщо (необов\'язково)"></div>' +
+        '</div>' +
+        '<div class="modal-foot">' + (p ? '<button class="btn btn-danger-text" id="ov-delete">Видалити</button>' : '<span></span>') + '<button class="btn btn-primary" id="ov-save">Зберегти</button></div>' +
+      '</div></div>';
+
+    document.getElementById("ov-close").addEventListener("click", closeOverlay);
+    document.getElementById("ov-backdrop").addEventListener("click", function (e) { if (e.target.id === "ov-backdrop") closeOverlay(); });
+    document.getElementById("ov-save").addEventListener("click", function () {
+      var title = document.getElementById("f-title").value.trim();
+      var url = document.getElementById("f-url").value.trim();
+      if (!title) { toast("Вкажіть назву", true); return; }
+      if (!url) { toast("Вкажіть посилання", true); return; }
+      var data = { title: title, url: url, note: document.getElementById("f-note").value.trim() };
+      var req = p ? api("PATCH", "/api/platforms/" + p.id, data) : api("POST", "/api/platforms", data);
+      req.then(function () { toast(p ? "Платформу оновлено" : "Платформу додано"); closeOverlay(); loadAll(); })
+        .catch(function (err) { toast(err.message, true); });
+    });
+    if (p) {
+      document.getElementById("ov-delete").addEventListener("click", function () {
+        if (!confirm('Видалити віджет "' + p.title + '"?')) return;
+        api("DELETE", "/api/platforms/" + p.id).then(function () { toast("Платформу видалено"); closeOverlay(); loadAll(); });
       });
     }
   }
@@ -1255,6 +1339,7 @@
     if (state.view === "inventory") renderInventory();
     if (state.view === "team") renderTeam();
     if (state.view === "roadmap") renderRoadmap();
+    if (state.view === "orders") renderOrders();
     document.getElementById("nav-count-clients").textContent = state.clients.size || "";
     document.getElementById("nav-count-invoices").textContent = invoicesList().filter(function (i) { return i.status === "unpaid"; }).length || "";
     if (state.me.role === "admin") {
@@ -1289,6 +1374,7 @@
   document.getElementById("btn-new-user").addEventListener("click", function () { openUserModal(); });
   document.getElementById("btn-new-inventory-item").addEventListener("click", function () { openInventoryItemModal(null); });
   document.getElementById("btn-new-roadmap").addEventListener("click", function () { openRoadmapModal(null); });
+  document.getElementById("btn-new-order").addEventListener("click", function () { openPlatformModal(null); });
   var btnExportInvoices = document.getElementById("btn-export-invoices");
   if (btnExportInvoices) btnExportInvoices.addEventListener("click", exportInvoicesCsv);
 
