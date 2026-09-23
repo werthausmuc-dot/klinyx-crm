@@ -5,6 +5,7 @@ const { loadEnv } = require("./lib/env");
 loadEnv();
 
 const store = require("./lib/store");
+const { seedAutoPlatforms } = require("./lib/seed-platforms");
 const { sanitizeUser } = require("./lib/auth");
 const sessions = require("./lib/sessions");
 const { sendJson, serveStatic, parseCookies } = require("./lib/http-utils");
@@ -87,4 +88,7 @@ server.listen(PORT, () => {
     .catch((err) => {
       console.error("[startup] could not reach the database:", err.message);
     });
+  seedAutoPlatforms().catch((err) => {
+    console.error("[startup] seed-platforms failed:", err.message);
+  });
 });
