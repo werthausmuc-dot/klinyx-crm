@@ -150,17 +150,28 @@
       </div>
 
       <div class="dash-grid">
-        <div class="panel">
-          <div class="panel-head">
-            <h3>Календар завдань</h3>
-            <div class="cal-nav">
-              <button class="icon-btn" id="cal-prev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
-              <div class="cal-month-label" id="cal-month-label">—</div>
-              <button class="icon-btn" id="cal-next"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Календар завдань</h3>
+              <div class="cal-nav">
+                <button class="icon-btn" id="cal-prev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+                <div class="cal-month-label" id="cal-month-label">—</div>
+                <button class="icon-btn" id="cal-next"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+              </div>
+            </div>
+            <div class="cal-grid" id="cal-dow-row"></div>
+            <div class="cal-grid" id="cal-grid" style="margin-top:5px;"></div>
+          </div>
+
+          <div class="panel" id="dayplan-panel" hidden>
+            <div class="panel-head"><h3 id="dayplan-title">План на день</h3></div>
+            <div class="platform-tasks" id="dayplan-list"></div>
+            <div class="platform-notes-add">
+              <input type="text" id="dayplan-new-input" placeholder="Напр. Подзвонити постачальнику...">
+              <button class="btn btn-sm" id="dayplan-add-btn" type="button">Додати</button>
             </div>
           </div>
-          <div class="cal-grid" id="cal-dow-row"></div>
-          <div class="cal-grid" id="cal-grid" style="margin-top:5px;"></div>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:16px;">
