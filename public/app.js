@@ -36,7 +36,8 @@
     selectedDay: null,
     clientFilter: "all",
     clientQuery: "",
-    invoiceFilter: "all"
+    invoiceFilter: "all",
+    ordersTab: "manual"
   };
 
   function todayStr() { return fmtDate(new Date()); }
@@ -847,14 +848,37 @@
 
   /* ============ orders: platform quick-access widgets ============ */
   function renderOrders() {
-    var items = platformsList().sort(function (a, b) { return (a.createdAt || "").localeCompare(b.createdAt || ""); });
+    var all = platformsList().sort(function (a, b) { return (a.createdAt || "").localeCompare(b.createdAt || ""); });
     var isAdmin = !!(state.me && state.me.role === "admin");
     var adminActions = document.getElementById("orders-admin-actions");
-    if (adminActions) adminActions.hidden = !isAdmin;
+    if (adminActions) adminActions.hidden = !isAdmin || state.ordersTab !== "manual";
+
+    var tabsWrap = document.getElementById("orders-tabs");
+    if (tabsWrap) {
+      tabsWrap.querySelectorAll("[data-orders-tab]").forEach(function (chip) {
+        chip.classList.toggle("active", chip.getAttribute("data-orders-tab") === state.ordersTab);
+      });
+      if (!tabsWrap.dataset.wired) {
+        tabsWrap.dataset.wired = "1";
+        tabsWrap.querySelectorAll("[data-orders-tab]").forEach(function (chip) {
+          chip.addEventListener("click", function () {
+            state.ordersTab = chip.getAttribute("data-orders-tab");
+            renderOrders();
+          });
+        });
+      }
+    }
+
+    var items = all.filter(function (p) { return (p.source || "manual") === state.ordersTab; });
 
     var grid = document.getElementById("orders-grid");
     var emptyNote = document.getElementById("orders-empty");
-    if (emptyNote) emptyNote.hidden = items.length > 0 || isAdmin;
+    if (emptyNote) {
+      emptyNote.hidden = items.length > 0 || (state.ordersTab === "manual" && isAdmin);
+      emptyNote.textContent = state.ordersTab === "auto"
+        ? "Рекомендованих платформ ще немає."
+        : "Платформ ще немає — додай першу кнопкою вище.";
+    }
 
     var html = items.map(function (p) {
       var initial = (p.title || "?").trim().charAt(0).toUpperCase();
@@ -884,7 +908,7 @@
       '</a>';
     }).join("");
 
-    if (isAdmin) {
+    if (isAdmin && state.ordersTab === "manual") {
       html += '<button class="widget-card-add" id="btn-new-order-tile">' +
         '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Додати платформу</button>';
     }
