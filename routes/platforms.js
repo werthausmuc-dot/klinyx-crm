@@ -13,6 +13,7 @@ function clean(body) {
   }
   if (typeof body.note === "string") data.note = body.note.trim();
   if (typeof body.done === "boolean") data.done = body.done;
+  if (body.source === "manual" || body.source === "auto") data.source = body.source;
   return data;
 }
 
@@ -31,6 +32,7 @@ module.exports = function registerPlatformRoutes(router) {
     if (!data.title) return sendJson(res, 400, { error: "invalid_input", message: "Вкажіть назву платформи." });
     if (!data.url) return sendJson(res, 400, { error: "invalid_input", message: "Вкажіть посилання." });
     if (typeof data.done !== "boolean") data.done = false;
+    if (!data.source) data.source = "manual";
     data.createdBy = req.user.id;
     sendJson(res, 201, await store.create("platforms", data));
   });
