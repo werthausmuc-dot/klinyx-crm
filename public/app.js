@@ -26,6 +26,7 @@
     inventory: new Map(),
     roadmap: new Map(),
     platforms: new Map(),
+    dayPlans: new Map(),
     users: [],
     roster: [],
     telegram: null,
@@ -289,7 +290,8 @@
       api("GET", "/api/users/roster"),
       state.me && state.me.role === "admin" ? api("GET", "/api/inventory") : Promise.resolve(null),
       api("GET", "/api/roadmap"),
-      api("GET", "/api/platforms")
+      api("GET", "/api/platforms"),
+      state.me && state.me.role === "admin" ? api("GET", "/api/dayplans") : Promise.resolve(null)
     ]).then(function (res) {
       state.clients = new Map(res[0].map(function (c) { return [c.id, c]; }));
       state.jobs = new Map(res[1].map(function (j) { return [j.id, j]; }));
@@ -299,6 +301,7 @@
       if (res[5]) state.inventory = new Map(res[5].map(function (it) { return [it.id, it]; }));
       state.roadmap = new Map((res[6] || []).map(function (r) { return [r.id, r]; }));
       state.platforms = new Map((res[7] || []).map(function (p) { return [p.id, p]; }));
+      if (res[8]) state.dayPlans = new Map(res[8].map(function (d) { return [d.id, d]; }));
       render();
     }).catch(function (err) {
       if (err && err.code !== "not_authenticated") toast(err.message || "Не вдалося оновити дані", true);
@@ -380,6 +383,7 @@
     renderCalendar();
     renderAgenda();
     renderReminders();
+    renderDayPlan();
   }
 
   function renderCalendar() {
@@ -427,8 +431,94 @@
         state.selectedDay = (state.selectedDay === d) ? null : d;
         renderCalendar();
         renderAgenda();
+        renderDayPlan();
       });
     });
+  }
+
+  /* ============ dashboard: day plan (admin-only, per-date to-dos) ============ */
+  // General plan items for a day — "подзвонити постачальнику", "забрати
+  // інвентар зі складу" — separate from the cleaning jobs on the calendar.
+  // Admin-only, both in the UI and on the backend.
+  function dayPlanDate() { return state.selectedDay || todayStr(); }
+
+  function dayPlansForDate(date) {
+    return Array.from(state.dayPlans.values())
+      .filter(function (d) { return d.date === date; })
+      .sort(function (a, b) { return (a.createdAt || "").localeCompare(b.createdAt || ""); });
+  }
+
+  function renderDayPlanList(items) {
+    if (!items.length) return '<div class="empty-note">На цей день ще немає пунктів плану.</div>';
+    return items.map(function (d) {
+      return '<div class="platform-task-row">' +
+        '<button class="platform-task-check' + (d.done ? ' done' : '') + '" data-toggle-dayplan="' + d.id + '" title="' + (d.done ? "Позначити не виконано" : "Позначити виконано") + '">' +
+          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></button>' +
+        '<div class="platform-task-title' + (d.done ? ' done' : '') + '">' + escapeHtml(d.text) + '</div>' +
+        '<button class="icon-btn platform-task-remove" data-remove-dayplan="' + d.id + '" title="Видалити пункт">' +
+          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
+      '</div>';
+    }).join("");
+  }
+
+  function wireDayPlanList() {
+    var list = document.getElementById("dayplan-list");
+    if (!list) return;
+    list.querySelectorAll("[data-toggle-dayplan]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-toggle-dayplan");
+        var item = state.dayPlans.get(id);
+        api("PATCH", "/api/dayplans/" + id, { done: !(item && item.done) })
+          .then(function (updated) { state.dayPlans.set(id, updated); renderDayPlan(); })
+          .catch(function (err) { toast(err.message, true); });
+      });
+    });
+    list.querySelectorAll("[data-remove-dayplan]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-remove-dayplan");
+        api("DELETE", "/api/dayplans/" + id)
+          .then(function () { state.dayPlans.delete(id); renderDayPlan(); })
+          .catch(function (err) { toast(err.message, true); });
+      });
+    });
+  }
+
+  function renderDayPlan() {
+    var panel = document.getElementById("dayplan-panel");
+    if (!panel) return;
+    var isAdmin = !!(state.me && state.me.role === "admin");
+    panel.hidden = !isAdmin;
+    if (!isAdmin) return;
+
+    var date = dayPlanDate();
+    var title = document.getElementById("dayplan-title");
+    if (title) title.textContent = "План на " + fmtDateHuman(date) + (date === todayStr() ? " (сьогодні)" : "");
+
+    var list = document.getElementById("dayplan-list");
+    if (list) {
+      list.innerHTML = renderDayPlanList(dayPlansForDate(date));
+      wireDayPlanList();
+    }
+
+    var input = document.getElementById("dayplan-new-input");
+    var addBtn = document.getElementById("dayplan-add-btn");
+    if (addBtn && !addBtn.dataset.wired) {
+      addBtn.dataset.wired = "1";
+      var doAdd = function () {
+        var el = document.getElementById("dayplan-new-input");
+        var text = el ? el.value.trim() : "";
+        if (!text) return;
+        api("POST", "/api/dayplans", { date: dayPlanDate(), text: text }).then(function (created) {
+          state.dayPlans.set(created.id, created);
+          if (el) el.value = "";
+          renderDayPlan();
+        }).catch(function (err) { toast(err.message, true); });
+      };
+      addBtn.addEventListener("click", doAdd);
+      document.getElementById("dayplan-panel").addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && e.target && e.target.id === "dayplan-new-input") { e.preventDefault(); doAdd(); }
+      });
+    }
   }
 
   function assigneeName(id) {
