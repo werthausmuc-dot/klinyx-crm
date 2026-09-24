@@ -380,6 +380,8 @@
     var monthTotal = sumPrice(monthJobsF), monthPaid = sumPrice(monthJobsF.filter(function (j) { return j.paid; }));
     document.getElementById("fin-week").textContent = fmtMoney(weekTotal) + " (оплачено " + fmtMoney(weekPaid) + ")";
     document.getElementById("fin-month").textContent = fmtMoney(monthTotal) + " (оплачено " + fmtMoney(monthPaid) + ")";
+    var statMonthIncome = document.getElementById("stat-month-income");
+    if (statMonthIncome) statMonthIncome.textContent = fmtMoney(monthTotal);
 
     renderCalendar();
     renderAgenda();
