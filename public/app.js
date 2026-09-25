@@ -13,10 +13,15 @@
     "Інше"
   ];
   var UNITS = ["л", "кг", "шт", "уп"];
-  var DOW = { uk: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"], de: ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] };
+  var DOW = {
+    uk: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"],
+    de: ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"],
+    ar: ["اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت", "أحد"]
+  };
   var MONTHS = {
     uk: ["Січень", "Лютий", "Березень", "Квітень", "Травень", "Червень", "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень"],
-    de: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
+    de: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
+    ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
   };
   var POLL_MS = 20000;
 
@@ -213,12 +218,331 @@
     "Швидкий перехід на платформи, де шукаємо замовлення": "Schnellzugriff auf Plattformen, auf denen wir Aufträge suchen",
     "Додані вручну": "Manuell hinzugefügt", "Рекомендовані (авто)": "Empfohlen (automatisch)"
   };
+  var I18N = {
+    de: I18N_DE,
+    ar: {
+      "Адміністратор": "المسؤول",
+      "Співробітник": "الموظف",
+      "адмін": "مسؤول",
+      "співробітник": "موظف",
+      "активний": "نشط",
+      "вимкнено": "معطّل",
+      "підключено": "متصل",
+      "не підключено": "غير متصل",
+      "Сповіщення в Telegram": "إشعارات تيليجرام",
+      "Завантаження...": "جارٍ التحميل...",
+      "Telegram-бот ще не налаштований адміністратором сервера. Зверніться до того, хто розгортав CRM.": "لم يقم مسؤول الخادم بإعداد بوت تيليجرام بعد. يرجى التواصل مع من قام بنشر نظام CRM.",
+      "✅ Ваш акаунт під'єднано — сповіщення про призначені завдання приходитимуть у Telegram.": "✅ تم ربط حسابك — ستصلك إشعارات المهام المسندة إليك عبر تيليجرام.",
+      "Під'єднати інший Telegram / переприв'язати": "ربط حساب تيليجرام آخر / إعادة الربط",
+      "Щоб перепідключити на інший Telegram-акаунт, надішліть боту новий код нижче — щойно він це отримає, старий зв'язок заміниться новим.": "للتبديل إلى حساب تيليجرام آخر، أرسل للبوت الرمز الجديد أدناه — بمجرد استلامه سيحل الرابط الجديد محل القديم.",
+      "Натисніть кнопку нижче — відкриється Telegram і бот сам вас під'єднає.": "اضغط على الزر أدناه — سيفتح تيليجرام وسيقوم البوت بربط حسابك تلقائيًا.",
+      "Під'єднати Telegram": "ربط تيليجرام",
+      "Або вручну: напишіть боту": "أو يدويًا: أرسل للبوت",
+      " команду:": " الأمر:",
+      "Новий код": "رمز جديد",
+      "Новий код згенеровано — надішліть його боту в Telegram": "تم إنشاء رمز جديد — أرسله إلى البوت في تيليجرام",
+      "Не вдалося створити акаунт": "تعذّر إنشاء الحساب",
+      "Не вдалося увійти": "تعذّر تسجيل الدخول",
+      "Сталася помилка": "حدث خطأ",
+      "Не вдалося оновити дані": "تعذّر تحديث البيانات",
+      "(клієнт видалений)": "(تم حذف العميل)",
+      "заплановано": "مجدول",
+      "виконано": "منجز",
+      "скасовано": "ملغى",
+      "лід": "عميل محتمل",
+      "неактивний": "غير نشط",
+      "прострочено": "متأخر",
+      "неоплачено": "غير مدفوع",
+      "оплачено": "مدفوع",
+      "не оплачено": "غير مدفوع",
+      " (оплачено ": " (مدفوع ",
+      "На цей день ще немає пунктів плану.": "لا توجد بنود في الخطة لهذا اليوم بعد.",
+      "Позначити не виконано": "تعليم كغير منجز",
+      "Позначити виконано": "تعليم كمنجز",
+      "Видалити пункт": "حذف البند",
+      "План на ": "خطة يوم ",
+      " (сьогодні)": " (اليوم)",
+      " — завдання": " — المهام",
+      "Найближчі завдання": "المهام القادمة",
+      "Немає запланованих завдань": "لا توجد مهام مجدولة",
+      " на цей день": " لهذا اليوم",
+      "завдання": "مهمة",
+      "Прострочено: ": "متأخر: ",
+      "Нічого термінового — усе під контролем.": "لا شيء عاجل — كل شيء تحت السيطرة.",
+      "Позначити оплаченим": "تعليم كمدفوع",
+      "Скасувати оплату": "إلغاء الدفع",
+      "Рахунок позначено оплаченим": "تم تعليم الفاتورة كمدفوعة",
+      "Видалити цей рахунок?": "حذف هذه الفاتورة؟",
+      "Рахунок видалено": "تم حذف الفاتورة",
+      "Клієнт": "العميل",
+      "Опис": "الوصف",
+      "Сума": "المبلغ",
+      "Термін оплати": "موعد الاستحقاق",
+      "Статус": "الحالة",
+      "Дата створення": "تاريخ الإنشاء",
+      "(ви)": "(أنت)",
+      "Скинути пароль": "إعادة تعيين كلمة المرور",
+      "Прибрати адміна": "إزالة صلاحيات المسؤول",
+      "Зробити адміном": "منح صلاحيات المسؤول",
+      "Вимкнути": "تعطيل",
+      "Увімкнути": "تفعيل",
+      "Новий пароль для цього співробітника (мінімум 8 символів):": "كلمة مرور جديدة لهذا الموظف (8 أحرف على الأقل):",
+      "Пароль оновлено": "تم تحديث كلمة المرور",
+      "Призначити ": "هل تريد تعيين ",
+      " адміністратором?": " مسؤولاً؟",
+      "Прибрати права адміністратора в ": "إزالة صلاحيات المسؤول عن ",
+      "?": "؟",
+      "Роль оновлено": "تم تحديث الدور",
+      "Статус оновлено": "تم تحديث الحالة",
+      "Видалити цей обліковий запис?": "حذف هذا الحساب؟",
+      "Акаунт видалено": "تم حذف الحساب",
+      "в процесі": "قيد التنفيذ",
+      "готово": "مكتمل",
+      "← заплановано": "← مخطط",
+      "готово →": "مكتمل →",
+      "Редагувати пункт": "تعديل البند",
+      "Новий пункт плану": "بند خطة جديد",
+      "Назва *": "الاسم *",
+      "Напр. Клієнтський портал": "مثال: بوابة العملاء",
+      "Коротко, що це і навіщо": "وصف موجز: ما هذا ولماذا",
+      "Заплановано": "مخطط",
+      "В процесі": "قيد التنفيذ",
+      "Готово": "مكتمل",
+      "Видалити": "حذف",
+      "Зберегти": "حفظ",
+      "Вкажіть назву": "يرجى إدخال الاسم",
+      "Пункт оновлено": "تم تحديث البند",
+      "Пункт додано": "تمت إضافة البند",
+      "Пункт видалено": "تم حذف البند",
+      "Рекомендованих платформ ще немає.": "لا توجد منصات موصى بها بعد.",
+      "Платформ ще немає — додай першу кнопкою вище.": "لا توجد منصات بعد — أضف الأولى بالزر أعلاه.",
+      "Редагувати": "تعديل",
+      "Позначити ": "تعليم ",
+      "Виконано": "منجز",
+      "Не виконано": "غير منجز",
+      "Нотатка для себе...": "ملاحظة لنفسك...",
+      "Нове завдання...": "مهمة جديدة...",
+      "Додати": "إضافة",
+      "Відкрити": "فتح",
+      "Додати платформу": "إضافة منصة",
+      "Записів ще немає.": "لا توجد سجلات بعد.",
+      "Видалити запис": "حذف السجل",
+      "Немає історії.": "لا يوجد سجل.",
+      "Завдань ще немає.": "لا توجد مهام بعد.",
+      "Історія статусу": "سجل الحالة",
+      "Видалити завдання": "حذف المهمة",
+      " Завдання": " المهام",
+      "Редагувати платформу": "تعديل المنصة",
+      "Нова платформа": "منصة جديدة",
+      "Напр. Helpling": "مثال: Helpling",
+      "Посилання *": "الرابط *",
+      "Завдання": "المهام",
+      "Нове завдання, напр. «Реєстрація»": "مهمة جديدة، مثال «التسجيل»",
+      "Нотатки": "الملاحظات",
+      "Додати запис, напр. «Зареєструвався», «3 замовлення»": "أضف سجلاً، مثال «تم التسجيل»، «3 طلبات»",
+      "Нотатка": "ملاحظة",
+      "Коротко, навіщо (необов'язково)": "باختصار، لماذا (اختياري)",
+      "Реєстрацію вже виконано": "تم التسجيل بالفعل",
+      "Вкажіть посилання": "يرجى إدخال الرابط",
+      "Платформу оновлено": "تم تحديث المنصة",
+      "Платформу додано": "تمت إضافة المنصة",
+      "Платформу видалено": "تم حذف المنصة",
+      "Редагувати клієнта": "تعديل العميل",
+      "Новий клієнт": "عميل جديد",
+      "Ім'я / назва *": "الاسم *",
+      "Напр. Анна Шмідт": "مثال: آنا شميدت",
+      "Телефон": "الهاتف",
+      "Адреса": "العنوان",
+      "Вулиця, місто": "الشارع، المدينة",
+      "Особливості об'єкта, домовленості...": "خصائص المكان، الاتفاقات...",
+      "Видалити клієнта": "حذف العميل",
+      "Додати клієнта": "إضافة عميل",
+      "Видалити клієнта \"": "حذف العميل \"",
+      "\"? Пов'язані завдання й рахунки залишаться в системі.": "\"؟ ستبقى المهام والفواتير المرتبطة في النظام.",
+      "Видалити товар \"": "حذف الصنف \"",
+      "\" зі складу? Історію списань буде збережено.": "\" من المخزون؟ سيتم الاحتفاظ بسجل السحوبات.",
+      "Видалити пункт \"": "حذف البند \"",
+      "\" з плану розвитку?": "\" من خطة التطوير؟",
+      " віджет \"": " الودجت \"",
+      "Вкажіть ім'я клієнта": "يرجى إدخال اسم العميل",
+      "Клієнта оновлено": "تم تحديث بيانات العميل",
+      "Клієнта додано": "تمت إضافة العميل",
+      "Клієнта видалено": "تم حذف العميل",
+      "Контакти": "جهات الاتصال",
+      "+ Додати": "+ إضافة",
+      "Ще немає завдань": "لا توجد مهام بعد",
+      "Рахунки": "الفواتير",
+      "Ще немає рахунків": "لا توجد فواتير بعد",
+      "Редагувати завдання": "تعديل المهمة",
+      "Нове завдання": "مهمة جديدة",
+      "Клієнт *": "العميل *",
+      "Дата *": "التاريخ *",
+      "Час": "الوقت",
+      "Тип послуги": "نوع الخدمة",
+      "Адреса об'єкта": "عنوان الموقع",
+      "Вартість, €": "التكلفة، €",
+      "Виконавець": "المنفذ",
+      "— не призначено —": "— غير مسند —",
+      " (адмін)": " (مسؤول)",
+      " · без Telegram": " · بدون تيليجرام",
+      "\"· без Telegram\" — сповіщення про призначення не дійде, доки людина не під'єднає бота.": "«· بدون تيليجرام» — لن يصل إشعار التعيين حتى يقوم الشخص بربط البوت.",
+      "Оплата": "الدفع",
+      "не повторюється": "لا يتكرر",
+      "щотижня": "أسبوعيًا",
+      "що 2 тижні": "كل أسبوعين",
+      "щомісяця": "شهريًا",
+      "Повторення": "التكرار",
+      "Повторювати до (необов'язково)": "التكرار حتى (اختياري)",
+      "Наступні дати з'являться автоматично (наперед приблизно на 2 місяці). Про кожну згенеровану дату Telegram-сповіщення не надсилається — тільки про перше створене завдання.": "ستظهر التواريخ التالية تلقائيًا (لمدة شهرين تقريبًا مقدمًا). لا يُرسل إشعار تيليجرام عن كل تاريخ يتم إنشاؤه — فقط عن أول مهمة تُنشأ.",
+      "Вкажіть дату": "يرجى إدخال التاريخ",
+      "Завдання оновлено": "تم تحديث المهمة",
+      "Завдання заплановано": "تمت جدولة المهمة",
+      "Видалити це завдання?": "حذف هذه المهمة؟",
+      "Завдання видалено": "تم حذف المهمة",
+      "Редагувати рахунок": "تعديل الفاتورة",
+      "Новий рахунок": "فاتورة جديدة",
+      "Сума, € *": "المبلغ، € *",
+      "Дата виставлення": "تاريخ الإصدار",
+      "Напр. Генеральне прибирання, вул. ...": "مثال: تنظيف عام، شارع ...",
+      "Вкажіть суму": "يرجى إدخال المبلغ",
+      "Рахунок оновлено": "تم تحديث الفاتورة",
+      "Рахунок створено": "تم إنشاء الفاتورة",
+      "Списати": "سحب",
+      "Поповнити": "تعبئة",
+      "Не вдалося прочитати зображення": "تعذّرت قراءة الصورة",
+      "Редагувати товар": "تعديل الصنف",
+      "Новий товар": "صنف جديد",
+      "Напр. Засіб для скла": "مثال: منظف الزجاج",
+      "Одиниця виміру": "وحدة القياس",
+      "Початковий залишок": "الرصيد الأولي",
+      "Мінімальний залишок (поріг попередження)": "الحد الأدنى للمخزون (عتبة التنبيه)",
+      "Інвентарний номер": "رقم الجرد",
+      "Напр. INV-001": "مثال: INV-001",
+      "Фото товару": "صورة الصنف",
+      "Видалити фото": "حذف الصورة",
+      "Вкажіть назву товару": "يرجى إدخال اسم الصنف",
+      "Товар оновлено": "تم تحديث الصنف",
+      "Товар додано": "تمت إضافة الصنف",
+      "Товар видалено": "تم حذف الصنف",
+      "— не пов'язано із завданням —": "— غير مرتبط بمهمة —",
+      "Списати: ": "سحب: ",
+      "Поповнити: ": "تعبئة: ",
+      "Поточний залишок: ": "الرصيد الحالي: ",
+      "Кількість (": "الكمية (",
+      ") *": ") *",
+      "Напр. причина, партія...": "مثال: السبب، الدفعة...",
+      "Додати на склад": "إضافة إلى المخزون",
+      "Вкажіть кількість більше нуля": "يرجى إدخال كمية أكبر من صفر",
+      "Списано зі складу": "تم السحب من المخزون",
+      "Склад поповнено": "تمت تعبئة المخزون",
+      "Інформація": "المعلومات",
+      "Інв. номер": "رقم الجرد",
+      "Залишок": "الرصيد",
+      "Мінімальний залишок": "الحد الأدنى للمخزون",
+      "Історія": "السجل",
+      "Ще немає записів.": "لا توجد سجلات بعد.",
+      "Списано": "مسحوب",
+      "Поповнено": "معبّأ",
+      "Коригування": "تعديل",
+      "Не вдалося завантажити історію.": "تعذّر تحميل السجل.",
+      "Новий співробітник": "موظف جديد",
+      "Ім'я": "الاسم",
+      "Напр. Марія": "مثال: ماريا",
+      "Логін *": "اسم المستخدم *",
+      "Пароль *": "كلمة المرور *",
+      "Мінімум 8 символів": "8 أحرف على الأقل",
+      "Роль": "الدور",
+      "Створити": "إنشاء",
+      "Заповніть логін і пароль": "يرجى إدخال اسم المستخدم وكلمة المرور",
+      "Співробітника додано": "تمت إضافة الموظف",
+      "Генеральне прибирання": "تنظيف عام",
+      "Підтримуюче прибирання": "تنظيف دوري",
+      "Прибирання після ремонту": "تنظيف بعد التجديد",
+      "Миття вікон": "تنظيف النوافذ",
+      "Хімчистка м'яких меблів": "تنظيف الأثاث المنجد",
+      "Прибирання офісу / комерційного приміщення": "تنظيف المكاتب / المحلات التجارية",
+      "Прибирання ресторану / бару": "تنظيف المطاعم / البارات",
+      "Інше": "أخرى",
+      "л": "ل",
+      "кг": "كغ",
+      "шт": "قطعة",
+      "уп": "عبوة",
+      "Перший запуск": "الإعداد الأول",
+      "Створіть обліковий запис адміністратора": "أنشئ حساب المسؤول",
+      "Це буде перший акаунт у системі — з нього ви зможете додавати облікові записи для співробітників.": "سيكون هذا أول حساب في النظام — ومن خلاله يمكنك إضافة حسابات للموظفين.",
+      "Ваше ім'я": "اسمك",
+      "Напр. Олег": "مثال: أوليغ",
+      "Логін": "اسم المستخدم",
+      "Пароль": "كلمة المرور",
+      "Створити й увійти": "إنشاء وتسجيل الدخول",
+      "Вхід у систему": "تسجيل الدخول إلى النظام",
+      "Вхід": "تسجيل الدخول",
+      "Увійдіть під своїм робочим логіном.": "سجّل الدخول باستخدام بيانات عملك.",
+      "Увійти": "تسجيل الدخول",
+      "Меню": "القائمة",
+      "CRM & календар": "CRM والتقويم",
+      "Закрити меню": "إغلاق القائمة",
+      "Дашборд": "لوحة التحكم",
+      "Клієнти": "العملاء",
+      "Склад": "المخزون",
+      "Команда": "الفريق",
+      "План розвитку": "خطة التطوير",
+      "Замовлення": "الطلبات",
+      "Вийти": "تسجيل الخروج",
+      "Клієнтів усього": "إجمالي العملاء",
+      "Завдань цього тижня": "مهام هذا الأسبوع",
+      "Сьогодні заплановано": "مجدول اليوم",
+      "Неоплачено": "غير مدفوع",
+      "Орієнтовний заробіток за місяць": "الدخل التقديري لهذا الشهر",
+      "Календар завдань": "تقويم المهام",
+      "План на день": "خطة اليوم",
+      "Напр. Подзвонити постачальнику...": "مثال: الاتصال بالمورد...",
+      "Потребують уваги": "تحتاج إلى انتباه",
+      "Фінансові підсумки": "الملخص المالي",
+      "Цей тиждень": "هذا الأسبوع",
+      "Цей місяць": "هذا الشهر",
+      "Клієнтська база Kliny X": "قاعدة عملاء Kliny X",
+      "Пошук за ім'ям, телефоном, адресою...": "البحث بالاسم أو الهاتف أو العنوان...",
+      "Усі": "الكل",
+      "Ліди": "العملاء المحتملون",
+      "Активні": "النشطون",
+      "Неактивні": "غير النشطين",
+      "Наступне завдання": "المهمة التالية",
+      "Клієнтів ще немає. Додайте першого клієнта, щоб почати вести базу.": "لا يوجد عملاء بعد. أضف أول عميل للبدء في إدارة القاعدة.",
+      "Оплати та виставлені рахунки": "المدفوعات والفواتير الصادرة",
+      "Експорт CSV": "تصدير CSV",
+      "Виставити рахунок": "إصدار فاتورة",
+      "Виставлено всього": "إجمالي الصادر",
+      "Оплачено": "مدفوع",
+      "Неоплачені": "غير مدفوعة",
+      "Прострочені": "متأخرة",
+      "Оплачені": "مدفوعة",
+      "Рахунків ще немає.": "لا توجد فواتير بعد.",
+      "Облік хімії та витратних матеріалів": "إدارة المواد الكيميائية والمستهلكات",
+      "Додати товар": "إضافة صنف",
+      "Товар": "الصنف",
+      "Мін. залишок": "الحد الأدنى",
+      "Товарів ще немає. Додайте перший, щоб почати облік хімії.": "لا توجد أصناف بعد. أضف الأول لبدء إدارة المخزون.",
+      "Облікові записи співробітників для входу в систему": "حسابات الموظفين لتسجيل الدخول إلى النظام",
+      "Додати співробітника": "إضافة موظف",
+      "Що вже готово в Kliny X CRM і що далі": "ما الذي أُنجز في Kliny X CRM وما هو القادم",
+      "Додати пункт": "إضافة بند",
+      "Плану розвитку ще немає.": "لا توجد خطة تطوير بعد.",
+      "Швидкий перехід на платформи, де шукаємо замовлення": "وصول سريع إلى المنصات التي نبحث فيها عن الطلبات",
+      "Додані вручну": "مضافة يدويًا",
+      "Рекомендовані (авто)": "موصى بها (تلقائي)",
+    }
+  };
   function t(s) {
-    if (state.lang !== "de") return s;
-    return Object.prototype.hasOwnProperty.call(I18N_DE, s) ? I18N_DE[s] : s;
+    if (state.lang === "uk") return s;
+    var dict = I18N[state.lang];
+    return dict && Object.prototype.hasOwnProperty.call(dict, s) ? dict[s] : s;
   }
   function loadLang() {
-    try { return localStorage.getItem("klinyx_lang") === "de" ? "de" : "uk"; } catch (e) { return "uk"; }
+    try {
+      var l = localStorage.getItem("klinyx_lang");
+      return (l === "de" || l === "ar") ? l : "uk";
+    } catch (e) { return "uk"; }
   }
   function saveLang(l) {
     try { localStorage.setItem("klinyx_lang", l); } catch (e) { /* ignore */ }
@@ -240,13 +564,84 @@
       btn.classList.toggle("active", btn.getAttribute("data-lang") === state.lang);
     });
     document.documentElement.setAttribute("lang", state.lang);
+    document.documentElement.setAttribute("dir", state.lang === "ar" ? "rtl" : "ltr");
   }
   function setLang(l) {
-    if (l !== "uk" && l !== "de") return;
+    if (l !== "uk" && l !== "de" && l !== "ar") return;
     state.lang = l;
     saveLang(l);
     applyStaticI18n();
     if (state.me) render();
+    scheduleAutoTranslate();
+  }
+
+  /* ============ auto-translation of Arabic-authored notes ============ */
+  // Static UI strings are translated via t()/I18N above. Free-text content
+  // users type (client notes, platform notes/tasks, day-plan items) can't go
+  // through a static dictionary, so instead: if such text is detected as
+  // Arabic and the viewer's own UI language is NOT Arabic (they can't already
+  // read it), we show it as-is plus an automatically fetched translation
+  // underneath, via the free MyMemory API called directly from the browser.
+  var ARABIC_RE = /[؀-ۿ]/;
+  var translateCache = Object.create(null);
+  var autoTranslatePending = false;
+  function isArabicText(s) {
+    return typeof s === "string" && ARABIC_RE.test(s);
+  }
+  function decodeHtmlEntities(s) {
+    var el = document.createElement("textarea");
+    el.innerHTML = s;
+    return el.value;
+  }
+  // Wrap text for display: if it looks like Arabic and the viewer isn't
+  // reading the UI in Arabic, mark it so the MutationObserver below can find
+  // it and fill in a translation; otherwise behaves exactly like escapeHtml.
+  function autoTranslateHtml(s) {
+    var text = s == null ? "" : String(s);
+    if (!text || state.lang === "ar" || !isArabicText(text)) return escapeHtml(text);
+    return '<span class="auto-i18n" data-src="' + escapeHtml(text) + '"></span>';
+  }
+  function fetchTranslation(text, target, cb) {
+    var key = target + "::" + text;
+    if (Object.prototype.hasOwnProperty.call(translateCache, key)) { cb(translateCache[key]); return; }
+    var url = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(text) + "&langpair=ar|" + target;
+    fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+      var out = data && data.responseData && data.responseData.translatedText ? decodeHtmlEntities(data.responseData.translatedText) : null;
+      translateCache[key] = out;
+      cb(out);
+    }).catch(function () {
+      translateCache[key] = null;
+      cb(null);
+    });
+  }
+  function runAutoTranslate() {
+    if (state.lang === "ar") return;
+    var target = state.lang === "de" ? "de" : "uk";
+    document.querySelectorAll(".auto-i18n:not([data-translated])").forEach(function (span) {
+      span.setAttribute("data-translated", "1");
+      span.textContent = span.getAttribute("data-src");
+      var text = span.getAttribute("data-src");
+      fetchTranslation(text, target, function (translated) {
+        if (!translated || translated.trim() === text.trim()) return;
+        if (!span.parentNode) return;
+        var next = span.nextElementSibling;
+        if (!next || !next.classList.contains("auto-i18n-note")) {
+          var note = document.createElement("div");
+          note.className = "auto-i18n-note";
+          note.textContent = translated;
+          span.insertAdjacentElement("afterend", note);
+        }
+      });
+    });
+  }
+  function scheduleAutoTranslate() {
+    if (autoTranslatePending) return;
+    autoTranslatePending = true;
+    setTimeout(function () { autoTranslatePending = false; runAutoTranslate(); }, 150);
+  }
+  function setupAutoTranslateObserver() {
+    var observer = new MutationObserver(function () { scheduleAutoTranslate(); });
+    observer.observe(document.body, { childList: true, subtree: true });
   }
 
   /* ============ state ============ */
@@ -292,6 +687,7 @@
   function fmtDateHuman(s) {
     if (!s) return "—";
     var d = parseDate(s);
+    if (state.lang === "ar") return d.getDate() + " " + MONTHS.ar[d.getMonth()];
     return d.getDate() + " " + MONTHS[state.lang][d.getMonth()].toLowerCase().slice(0, 3) + ".";
   }
   function fmtMoney(n) {
@@ -360,6 +756,7 @@
   /* ============ auth flow ============ */
   function boot() {
     applyStaticI18n();
+    setupAutoTranslateObserver();
     api("GET", "/api/auth/me").then(function (data) {
       if (data.needsSetup) return showSetup();
       if (!data.user) return showLogin();
@@ -590,7 +987,8 @@
   /* ============ render: dashboard ============ */
   function renderDashboard() {
     var today = new Date();
-    document.getElementById("today-label").textContent = today.toLocaleDateString(state.lang === "de" ? "de-DE" : "uk-UA", { weekday: "long", day: "numeric", month: "long" });
+    var todayLocale = state.lang === "de" ? "de-DE" : state.lang === "ar" ? "ar-SA-u-nu-latn" : "uk-UA";
+    document.getElementById("today-label").textContent = today.toLocaleDateString(todayLocale, { weekday: "long", day: "numeric", month: "long" });
 
     var jobs = jobsSorted();
     var todayS = todayStr();
@@ -691,7 +1089,7 @@
       return '<div class="platform-task-row">' +
         '<button class="platform-task-check' + (d.done ? ' done' : '') + '" data-toggle-dayplan="' + d.id + '" title="' + (d.done ? t("Позначити не виконано") : t("Позначити виконано")) + '">' +
           '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></button>' +
-        '<div class="platform-task-title' + (d.done ? ' done' : '') + '">' + escapeHtml(d.text) + '</div>' +
+        '<div class="platform-task-title' + (d.done ? ' done' : '') + '">' + autoTranslateHtml(d.text) + '</div>' +
         '<button class="icon-btn platform-task-remove" data-remove-dayplan="' + d.id + '" title="' + t("Видалити пункт") + '">' +
           '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
       '</div>';
@@ -1129,7 +1527,7 @@
         '</' + (isAdmin ? 'button' : 'span') + '>' +
         (isAdmin
           ? '<input type="text" class="widget-personal-note" data-note-input="' + p.id + '" value="' + escapeHtml(p.note || "") + '" placeholder="' + t("Нотатка для себе...") + '">'
-          : (p.note ? '<div class="widget-personal-note is-readonly">' + escapeHtml(p.note) + '</div>' : '')) +
+          : (p.note ? '<div class="widget-personal-note is-readonly">' + autoTranslateHtml(p.note) + '</div>' : '')) +
         (isAdmin
           ? '<button class="widget-tasks-toggle" data-toggle-tasks="' + p.id + '" type="button">' + tasksToggleLabel(p) + '</button>' +
             '<div class="widget-tasks-panel" id="widget-tasks-panel-' + p.id + '" hidden>' +
@@ -1248,7 +1646,7 @@
     if (!notes.length) return '<div class="empty-note">' + t("Записів ще немає.") + '</div>';
     return notes.map(function (n) {
       return '<div class="platform-note-row">' +
-        '<div class="platform-note-text">' + escapeHtml(n.text) +
+        '<div class="platform-note-text">' + autoTranslateHtml(n.text) +
           '<span class="platform-note-meta">' + fmtDateHuman((n.createdAt || "").slice(0, 10)) + '</span></div>' +
         '<button class="icon-btn platform-note-remove" data-remove-note="' + escapeHtml(n.id) + '" title="' + t("Видалити запис") + '">' +
           '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
@@ -1295,7 +1693,7 @@
       return '<div class="platform-task-row">' +
         '<button class="platform-task-check' + (tk.done ? ' done' : '') + '" data-toggle-task="' + escapeHtml(tk.id) + '" title="' + (tk.done ? t("Позначити не виконано") : t("Позначити виконано")) + '">' +
           '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></button>' +
-        '<div class="platform-task-title' + (tk.done ? ' done' : '') + '">' + escapeHtml(tk.title) + '</div>' +
+        '<div class="platform-task-title' + (tk.done ? ' done' : '') + '">' + autoTranslateHtml(tk.title) + '</div>' +
         '<button class="icon-btn platform-task-history" data-history-task="' + escapeHtml(tk.id) + '" title="' + t("Історія статусу") + '">' +
           '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></button>' +
         '<button class="icon-btn platform-task-remove" data-remove-task="' + escapeHtml(tk.id) + '" title="' + t("Видалити завдання") + '">' +
@@ -1530,7 +1928,7 @@
             '<div class="kv-row"><div class="k">' + t("Телефон") + '</div><div class="v">' + escapeHtml(c.phone || "—") + '</div></div>' +
             '<div class="kv-row"><div class="k">Email</div><div class="v">' + escapeHtml(c.email || "—") + '</div></div>' +
             '<div class="kv-row"><div class="k">' + t("Адреса") + '</div><div class="v">' + escapeHtml(c.address || "—") + '</div></div></div></div>' +
-          (c.notes ? '<div class="drawer-section"><h4>' + t("Нотатки") + '</h4><div style="font-size:13px;">' + escapeHtml(c.notes) + '</div></div>' : '') +
+          (c.notes ? '<div class="drawer-section"><h4>' + t("Нотатки") + '</h4><div style="font-size:13px;">' + autoTranslateHtml(c.notes) + '</div></div>' : '') +
           '<div class="drawer-section"><h4 style="display:flex; justify-content:space-between; align-items:center;">' + t("Завдання") + ' <button class="btn btn-sm" id="dr-add-job">' + t("+ Додати") + '</button></h4>' +
             (history.length ? history.map(function (j) {
               var repeatIcon = j.seriesId ? '🔁 ' : '';
@@ -1920,7 +2318,7 @@
         var sign = l.type === "usage" ? "−" : l.type === "restock" ? "+" : "";
         return '<div class="job-row"><div class="agenda-date">' + fmtDateHuman((l.createdAt || "").slice(0, 10)) + '</div>' +
           '<div class="agenda-main"><div class="title">' + typeLabel + ": " + sign + Number(l.quantity) + " " + escapeHtml(l.unit || "") + '</div>' +
-          '<div class="meta">' + (l.jobLabel ? escapeHtml(l.jobLabel) + " · " : "") + escapeHtml(l.userName || "") + (l.note ? " · " + escapeHtml(l.note) : "") + '</div></div></div>';
+          '<div class="meta">' + (l.jobLabel ? escapeHtml(l.jobLabel) + " · " : "") + escapeHtml(l.userName || "") + (l.note ? " · " + autoTranslateHtml(l.note) : "") + '</div></div></div>';
       }).join("");
     }).catch(function () {
       var el = document.getElementById("inv-log-list");
