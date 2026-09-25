@@ -13,9 +13,241 @@
     "Інше"
   ];
   var UNITS = ["л", "кг", "шт", "уп"];
-  var DOW = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
-  var MONTHS = ["Січень", "Лютий", "Березень", "Квітень", "Травень", "Червень", "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень"];
+  var DOW = { uk: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"], de: ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] };
+  var MONTHS = {
+    uk: ["Січень", "Лютий", "Березень", "Квітень", "Травень", "Червень", "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень"],
+    de: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
+  };
   var POLL_MS = 20000;
+
+  /* ============ i18n ============ */
+  // Runtime UA/DE translation. Rather than introducing separate translation
+  // keys throughout the codebase, t() looks the ORIGINAL Ukrainian string up
+  // directly in I18N_DE and returns the German version when state.lang is
+  // "de" (falling back to the Ukrainian text itself for anything missing).
+  // Values that are also stored data (SERVICE_TYPES, UNITS, job/client/etc.
+  // status codes) keep their Ukrainian <option value> / stored value — only
+  // the on-screen label is translated — so switching language never changes
+  // what's saved in the database.
+  var I18N_DE = {
+    "Адміністратор": "Administrator", "Співробітник": "Mitarbeiter",
+    "адмін": "Admin", "співробітник": "Mitarbeiter", "активний": "aktiv", "вимкнено": "deaktiviert",
+    "підключено": "verbunden", "не підключено": "nicht verbunden",
+    "Сповіщення в Telegram": "Telegram-Benachrichtigungen", "Завантаження...": "Wird geladen...",
+    "Telegram-бот ще не налаштований адміністратором сервера. Зверніться до того, хто розгортав CRM.": "Der Telegram-Bot wurde vom Server-Administrator noch nicht eingerichtet. Wenden Sie sich an die Person, die das CRM aufgesetzt hat.",
+    "✅ Ваш акаунт під'єднано — сповіщення про призначені завдання приходитимуть у Telegram.": "✅ Ihr Konto ist verbunden — Benachrichtigungen zu zugewiesenen Aufträgen kommen jetzt per Telegram.",
+    "Під'єднати інший Telegram / переприв'язати": "Anderen Telegram-Account verbinden / neu verknüpfen",
+    "Щоб перепідключити на інший Telegram-акаунт, надішліть боту новий код нижче — щойно він це отримає, старий зв'язок заміниться новим.": "Um zu einem anderen Telegram-Account zu wechseln, senden Sie dem Bot den untenstehenden neuen Code — sobald er ihn erhält, ersetzt er die alte Verknüpfung.",
+    "Натисніть кнопку нижче — відкриється Telegram і бот сам вас під'єднає.": "Klicken Sie auf die Schaltfläche unten — Telegram öffnet sich und der Bot verbindet Sie automatisch.",
+    "Під'єднати Telegram": "Telegram verbinden",
+    "Або вручну: напишіть боту": "Oder manuell: Schreiben Sie dem Bot",
+    " команду:": " den Befehl:",
+    "Новий код": "Neuer Code",
+    "Новий код згенеровано — надішліть його боту в Telegram": "Neuer Code wurde generiert — senden Sie ihn dem Bot in Telegram",
+    "Не вдалося створити акаунт": "Konto konnte nicht erstellt werden",
+    "Не вдалося увійти": "Anmeldung fehlgeschlagen",
+    "Сталася помилка": "Ein Fehler ist aufgetreten",
+    "Не вдалося оновити дані": "Daten konnten nicht aktualisiert werden",
+    "(клієнт видалений)": "(Kunde gelöscht)",
+    "заплановано": "geplant", "виконано": "erledigt", "скасовано": "storniert",
+    "лід": "Lead", "неактивний": "inaktiv",
+    "прострочено": "überfällig", "неоплачено": "unbezahlt", "оплачено": "bezahlt", "не оплачено": "nicht bezahlt",
+    " (оплачено ": " (bezahlt: ",
+    "На цей день ще немає пунктів плану.": "Für diesen Tag gibt es noch keine Planpunkte.",
+    "Позначити не виконано": "Als nicht erledigt markieren", "Позначити виконано": "Als erledigt markieren",
+    "Видалити пункт": "Punkt löschen",
+    "План на ": "Plan für ", " (сьогодні)": " (heute)",
+    " — завдання": " — Aufträge", "Найближчі завдання": "Nächste Aufträge",
+    "Немає запланованих завдань": "Keine geplanten Aufträge", " на цей день": " an diesem Tag",
+    "завдання": "Auftrag", "Прострочено: ": "Überfällig: ",
+    "Нічого термінового — усе під контролем.": "Nichts Dringendes — alles unter Kontrolle.",
+    "Позначити оплаченим": "Als bezahlt markieren", "Скасувати оплату": "Zahlung stornieren",
+    "Рахунок позначено оплаченим": "Rechnung als bezahlt markiert",
+    "Видалити цей рахунок?": "Diese Rechnung löschen?", "Рахунок видалено": "Rechnung gelöscht",
+    "Клієнт": "Kunde", "Опис": "Beschreibung", "Сума": "Betrag", "Термін оплати": "Zahlungsziel",
+    "Статус": "Status", "Дата створення": "Erstellungsdatum",
+    "(ви)": "(Sie)", "Скинути пароль": "Passwort zurücksetzen",
+    "Прибрати адміна": "Admin-Rechte entziehen", "Зробити адміном": "Zum Admin machen",
+    "Вимкнути": "Deaktivieren", "Увімкнути": "Aktivieren",
+    "Новий пароль для цього співробітника (мінімум 8 символів):": "Neues Passwort für diesen Mitarbeiter (mindestens 8 Zeichen):",
+    "Пароль оновлено": "Passwort aktualisiert",
+    "Призначити ": "Soll ", " адміністратором?": " zum Administrator gemacht werden?",
+    "Прибрати права адміністратора в ": "Admin-Rechte entziehen für ", "?": "?",
+    "Роль оновлено": "Rolle aktualisiert", "Статус оновлено": "Status aktualisiert",
+    "Видалити цей обліковий запис?": "Dieses Konto löschen?", "Акаунт видалено": "Konto gelöscht",
+    "в процесі": "in Arbeit", "готово": "erledigt",
+    "← заплановано": "← geplant", "готово →": "erledigt →",
+    "Редагувати пункт": "Punkt bearbeiten", "Новий пункт плану": "Neuer Planpunkt",
+    "Назва *": "Name *", "Напр. Клієнтський портал": "Z. B. Kundenportal",
+    "Коротко, що це і навіщо": "Kurz: was und wofür",
+    "Заплановано": "Geplant", "В процесі": "In Arbeit", "Готово": "Erledigt",
+    "Видалити": "Löschen", "Зберегти": "Speichern", "Вкажіть назву": "Bitte Namen angeben",
+    "Пункт оновлено": "Punkt aktualisiert", "Пункт додано": "Punkt hinzugefügt",
+    "Пункт видалено": "Punkt gelöscht",
+    "Рекомендованих платформ ще немає.": "Noch keine empfohlenen Plattformen.",
+    "Платформ ще немає — додай першу кнопкою вище.": "Noch keine Plattformen — fügen Sie oben die erste hinzu.",
+    "Редагувати": "Bearbeiten",
+    "Позначити ": "Als ", "Виконано": "Erledigt", "Не виконано": "Nicht erledigt",
+    "Нотатка для себе...": "Notiz für sich selbst...", "Нове завдання...": "Neue Aufgabe...",
+    "Додати": "Hinzufügen", "Відкрити": "Öffnen", "Додати платформу": "Plattform hinzufügen",
+    "Записів ще немає.": "Noch keine Einträge.", "Видалити запис": "Eintrag löschen",
+    "Немає історії.": "Keine Historie.",
+    "Завдань ще немає.": "Noch keine Aufgaben.", "Історія статусу": "Statusverlauf",
+    "Видалити завдання": "Aufgabe löschen",
+    " Завдання": " Aufgaben",
+    "Редагувати платформу": "Plattform bearbeiten", "Нова платформа": "Neue Plattform",
+    "Напр. Helpling": "Z. B. Helpling", "Посилання *": "Link *",
+    "Завдання": "Aufgaben", "Нове завдання, напр. «Реєстрація»": "Neue Aufgabe, z. B. «Registrierung»",
+    "Нотатки": "Notizen", "Додати запис, напр. «Зареєструвався», «3 замовлення»": "Neuer Eintrag, z. B. «Registriert», «3 Aufträge»",
+    "Нотатка": "Notiz", "Коротко, навіщо (необов'язково)": "Kurz, wofür (optional)",
+    "Реєстрацію вже виконано": "Registrierung bereits erledigt",
+    "Вкажіть посилання": "Bitte Link angeben",
+    "Платформу оновлено": "Plattform aktualisiert", "Платформу додано": "Plattform hinzugefügt",
+    "Платформу видалено": "Plattform gelöscht",
+    "Редагувати клієнта": "Kunde bearbeiten", "Новий клієнт": "Neuer Kunde",
+    "Ім'я / назва *": "Name / Bezeichnung *", "Напр. Анна Шмідт": "Z. B. Anna Schmidt",
+    "Телефон": "Telefon", "Адреса": "Adresse", "Вулиця, місто": "Straße, Ort",
+    "Особливості об'єкта, домовленості...": "Besonderheiten des Objekts, Vereinbarungen...",
+    "Видалити клієнта": "Kunde löschen", "Додати клієнта": "Kunde hinzufügen",
+    "Видалити клієнта \"": "Kunden \"", "\"? Пов'язані завдання й рахунки залишаться в системі.": "\" löschen? Zugehörige Aufträge und Rechnungen bleiben im System erhalten.",
+    "Видалити товар \"": "Artikel \"", "\" зі складу? Історію списань буде збережено.": "\" aus dem Lager löschen? Der Verlauf der Entnahmen bleibt erhalten.",
+    "Видалити пункт \"": "Punkt \"", "\" з плану розвитку?": "\" aus dem Plan löschen?",
+    " віджет \"": " das Widget \"",
+    "Вкажіть ім'я клієнта": "Bitte Kundennamen angeben",
+    "Клієнта оновлено": "Kunde aktualisiert", "Клієнта додано": "Kunde hinzugefügt",
+    "Клієнта видалено": "Kunde gelöscht",
+    "Контакти": "Kontakte", "+ Додати": "+ Hinzufügen",
+    "Ще немає завдань": "Noch keine Aufträge", "Рахунки": "Rechnungen",
+    "Ще немає рахунків": "Noch keine Rechnungen",
+    "Редагувати завдання": "Auftrag bearbeiten", "Нове завдання": "Neuer Auftrag",
+    "Клієнт *": "Kunde *", "Дата *": "Datum *", "Час": "Uhrzeit", "Тип послуги": "Leistungsart",
+    "Адреса об'єкта": "Adresse des Objekts", "Вартість, €": "Preis, €", "Виконавець": "Ausführende(r)",
+    "— не призначено —": "— nicht zugewiesen —", " (адмін)": " (Admin)", " · без Telegram": " · ohne Telegram",
+    "\"· без Telegram\" — сповіщення про призначення не дійде, доки людина не під'єднає бота.": "„· ohne Telegram“ — die Zuweisungs-Benachrichtigung kommt erst an, wenn die Person den Bot verbindet.",
+    "Оплата": "Zahlung", "не повторюється": "wiederholt sich nicht",
+    "щотижня": "wöchentlich", "що 2 тижні": "alle 2 Wochen", "щомісяця": "monatlich",
+    "Повторення": "Wiederholung",
+    "Повторювати до (необов'язково)": "Wiederholen bis (optional)",
+    "Наступні дати з'являться автоматично (наперед приблизно на 2 місяці). Про кожну згенеровану дату Telegram-сповіщення не надсилається — тільки про перше створене завдання.": "Die nächsten Termine erscheinen automatisch (ca. 2 Monate im Voraus). Für jeden automatisch erzeugten Termin wird keine Telegram-Benachrichtigung gesendet — nur für den zuerst erstellten Auftrag.",
+    "Вкажіть дату": "Bitte Datum angeben",
+    "Завдання оновлено": "Auftrag aktualisiert", "Завдання заплановано": "Auftrag geplant",
+    "Видалити це завдання?": "Diesen Auftrag löschen?", "Завдання видалено": "Auftrag gelöscht",
+    "Редагувати рахунок": "Rechnung bearbeiten", "Новий рахунок": "Neue Rechnung",
+    "Сума, € *": "Betrag, € *", "Дата виставлення": "Ausstellungsdatum",
+    "Напр. Генеральне прибирання, вул. ...": "Z. B. Grundreinigung, Straße ...",
+    "Вкажіть суму": "Bitte Betrag angeben",
+    "Рахунок оновлено": "Rechnung aktualisiert", "Рахунок створено": "Rechnung erstellt",
+    "Списати": "Verbrauchen", "Поповнити": "Auffüllen",
+    "Не вдалося прочитати зображення": "Bild konnte nicht gelesen werden",
+    "Редагувати товар": "Artikel bearbeiten", "Новий товар": "Neuer Artikel",
+    "Напр. Засіб для скла": "Z. B. Glasreiniger", "Одиниця виміру": "Maßeinheit",
+    "Початковий залишок": "Anfangsbestand",
+    "Мінімальний залишок (поріг попередження)": "Mindestbestand (Warnschwelle)",
+    "Інвентарний номер": "Inventarnummer", "Напр. INV-001": "Z. B. INV-001",
+    "Фото товару": "Artikelfoto", "Видалити фото": "Foto löschen",
+    "Вкажіть назву товару": "Bitte Artikelnamen angeben",
+    "Товар оновлено": "Artikel aktualisiert", "Товар додано": "Artikel hinzugefügt",
+    "Товар видалено": "Artikel gelöscht",
+    "— не пов'язано із завданням —": "— keinem Auftrag zugeordnet —",
+    "Списати: ": "Verbrauchen: ", "Поповнити: ": "Auffüllen: ",
+    "Поточний залишок: ": "Aktueller Bestand: ",
+    "Кількість (": "Menge (", ") *": ") *",
+    "Напр. причина, партія...": "Z. B. Grund, Charge...",
+    "Додати на склад": "Zum Lager hinzufügen",
+    "Вкажіть кількість більше нуля": "Bitte eine Menge größer als null angeben",
+    "Списано зі складу": "Vom Lager abgebucht", "Склад поповнено": "Lager aufgefüllt",
+    "Інформація": "Informationen", "Інв. номер": "Inv.-Nr.", "Залишок": "Bestand",
+    "Мінімальний залишок": "Mindestbestand", "Історія": "Historie",
+    "Ще немає записів.": "Noch keine Einträge.",
+    "Списано": "Abgebucht", "Поповнено": "Aufgefüllt", "Коригування": "Korrektur",
+    "Не вдалося завантажити історію.": "Historie konnte nicht geladen werden.",
+    "Новий співробітник": "Neuer Mitarbeiter", "Ім'я": "Name", "Напр. Марія": "Z. B. Maria",
+    "Логін *": "Login *", "Пароль *": "Passwort *", "Мінімум 8 символів": "Mindestens 8 Zeichen",
+    "Роль": "Rolle", "Створити": "Erstellen",
+    "Заповніть логін і пароль": "Bitte Login und Passwort ausfüllen",
+    "Співробітника додано": "Mitarbeiter hinzugefügt",
+    // service types & units — display only; stored values stay Ukrainian
+    "Генеральне прибирання": "Grundreinigung", "Підтримуюче прибирання": "Unterhaltsreinigung",
+    "Прибирання після ремонту": "Reinigung nach Renovierung", "Миття вікон": "Fensterreinigung",
+    "Хімчистка м'яких меблів": "Polsterreinigung",
+    "Прибирання офісу / комерційного приміщення": "Büro-/Gewerbereinigung",
+    "Прибирання ресторану / бару": "Reinigung von Restaurant/Bar", "Інше": "Sonstiges",
+    "л": "l", "кг": "kg", "шт": "Stk", "уп": "Pck",
+    // static index.html strings (applied via data-i18n / data-i18n-placeholder / data-i18n-title)
+    "Перший запуск": "Erste Einrichtung",
+    "Створіть обліковий запис адміністратора": "Administratorkonto erstellen",
+    "Це буде перший акаунт у системі — з нього ви зможете додавати облікові записи для співробітників.": "Dies ist das erste Konto im System — von hier aus können Sie Konten für Mitarbeiter anlegen.",
+    "Ваше ім'я": "Ihr Name", "Напр. Олег": "Z. B. Oleg", "Логін": "Login", "Пароль": "Passwort",
+    "Створити й увійти": "Erstellen und anmelden",
+    "Вхід у систему": "Anmeldung", "Вхід": "Anmeldung",
+    "Увійдіть під своїм робочим логіном.": "Melden Sie sich mit Ihrem Arbeitslogin an.",
+    "Увійти": "Anmelden",
+    "Меню": "Menü", "CRM & календар": "CRM & Kalender", "Закрити меню": "Menü schließen",
+    "Дашборд": "Dashboard", "Клієнти": "Kunden", "Склад": "Lager", "Команда": "Team",
+    "План розвитку": "Entwicklungsplan", "Замовлення": "Aufträge", "Вийти": "Abmelden",
+    "Клієнтів усього": "Kunden gesamt", "Завдань цього тижня": "Aufträge diese Woche",
+    "Сьогодні заплановано": "Heute geplant", "Неоплачено": "Unbezahlt",
+    "Орієнтовний заробіток за місяць": "Geschätztes Monatseinkommen",
+    "Календар завдань": "Auftragskalender", "План на день": "Plan für den Tag",
+    "Напр. Подзвонити постачальнику...": "Z. B. Lieferanten anrufen...",
+    "Потребують уваги": "Erfordert Aufmerksamkeit", "Фінансові підсумки": "Finanzübersicht",
+    "Цей тиждень": "Diese Woche", "Цей місяць": "Dieser Monat",
+    "Клієнтська база Kliny X": "Kundendatenbank von Kliny X",
+    "Пошук за ім'ям, телефоном, адресою...": "Suche nach Name, Telefon, Adresse...",
+    "Усі": "Alle", "Ліди": "Leads", "Активні": "Aktiv", "Неактивні": "Inaktiv",
+    "Наступне завдання": "Nächster Auftrag",
+    "Клієнтів ще немає. Додайте першого клієнта, щоб почати вести базу.": "Noch keine Kunden. Fügen Sie den ersten Kunden hinzu, um die Datenbank zu starten.",
+    "Оплати та виставлені рахунки": "Zahlungen und ausgestellte Rechnungen",
+    "Експорт CSV": "CSV exportieren", "Виставити рахунок": "Rechnung ausstellen",
+    "Виставлено всього": "Gesamt ausgestellt", "Оплачено": "Bezahlt",
+    "Неоплачені": "Unbezahlt", "Прострочені": "Überfällig", "Оплачені": "Bezahlt",
+    "Рахунків ще немає.": "Noch keine Rechnungen.",
+    "Облік хімії та витратних матеріалів": "Verwaltung von Reinigungsmitteln und Verbrauchsmaterial",
+    "Додати товар": "Artikel hinzufügen", "Товар": "Artikel", "Мін. залишок": "Mindestbestand",
+    "Товарів ще немає. Додайте перший, щоб почати облік хімії.": "Noch keine Artikel. Fügen Sie den ersten hinzu, um die Lagerverwaltung zu starten.",
+    "Облікові записи співробітників для входу в систему": "Mitarbeiterkonten für die Systemanmeldung",
+    "Додати співробітника": "Mitarbeiter hinzufügen",
+    "Що вже готово в Kliny X CRM і що далі": "Was in Kliny X CRM bereits fertig ist und was als Nächstes kommt",
+    "Додати пункт": "Punkt hinzufügen",
+    "Плану розвитку ще немає.": "Noch kein Entwicklungsplan.",
+    "Швидкий перехід на платформи, де шукаємо замовлення": "Schnellzugriff auf Plattformen, auf denen wir Aufträge suchen",
+    "Додані вручну": "Manuell hinzugefügt", "Рекомендовані (авто)": "Empfohlen (automatisch)"
+  };
+  function t(s) {
+    if (state.lang !== "de") return s;
+    return Object.prototype.hasOwnProperty.call(I18N_DE, s) ? I18N_DE[s] : s;
+  }
+  function loadLang() {
+    try { return localStorage.getItem("klinyx_lang") === "de" ? "de" : "uk"; } catch (e) { return "uk"; }
+  }
+  function saveLang(l) {
+    try { localStorage.setItem("klinyx_lang", l); } catch (e) { /* ignore */ }
+  }
+  function applyStaticI18n() {
+    document.querySelectorAll("[data-i18n]").forEach(function (el) {
+      el.textContent = t(el.getAttribute("data-i18n"));
+    });
+    document.querySelectorAll("[data-i18n-placeholder]").forEach(function (el) {
+      el.setAttribute("placeholder", t(el.getAttribute("data-i18n-placeholder")));
+    });
+    document.querySelectorAll("[data-i18n-title]").forEach(function (el) {
+      el.setAttribute("title", t(el.getAttribute("data-i18n-title")));
+    });
+    document.querySelectorAll("[data-i18n-aria-label]").forEach(function (el) {
+      el.setAttribute("aria-label", t(el.getAttribute("data-i18n-aria-label")));
+    });
+    document.querySelectorAll(".lang-btn").forEach(function (btn) {
+      btn.classList.toggle("active", btn.getAttribute("data-lang") === state.lang);
+    });
+    document.documentElement.setAttribute("lang", state.lang);
+  }
+  function setLang(l) {
+    if (l !== "uk" && l !== "de") return;
+    state.lang = l;
+    saveLang(l);
+    applyStaticI18n();
+    if (state.me) render();
+  }
 
   /* ============ state ============ */
   var state = {
@@ -30,6 +262,7 @@
     users: [],
     roster: [],
     telegram: null,
+    lang: loadLang(),
     view: "dashboard",
     calYear: new Date().getFullYear(),
     calMonth: new Date().getMonth(),
@@ -59,7 +292,7 @@
   function fmtDateHuman(s) {
     if (!s) return "—";
     var d = parseDate(s);
-    return d.getDate() + " " + MONTHS[d.getMonth()].toLowerCase().slice(0, 3) + ".";
+    return d.getDate() + " " + MONTHS[state.lang][d.getMonth()].toLowerCase().slice(0, 3) + ".";
   }
   function fmtMoney(n) {
     n = Number(n) || 0;
@@ -82,7 +315,7 @@
       var m = line.match(urlLineRe);
       if (m) {
         return '<div class="roadmap-link-row"><span>' + escapeHtml(m[1].trim()) + '</span>' +
-          '<a class="btn-chip" href="' + escapeHtml(m[2]) + '" target="_blank" rel="noopener noreferrer">Увійти →</a></div>';
+          '<a class="btn-chip" href="' + escapeHtml(m[2]) + '" target="_blank" rel="noopener noreferrer">' + t("Увійти") + ' →</a></div>';
       }
       return line.trim() ? '<div>' + escapeHtml(line) + '</div>' : '<div>&nbsp;</div>';
     }).join("");
@@ -115,7 +348,7 @@
       }
       return res.json().catch(function () { return null; }).then(function (data) {
         if (!res.ok) {
-          var err = new Error((data && data.message) || "Сталася помилка");
+          var err = new Error((data && data.message) || t("Сталася помилка"));
           err.code = data && data.error;
           throw err;
         }
@@ -126,6 +359,7 @@
 
   /* ============ auth flow ============ */
   function boot() {
+    applyStaticI18n();
     api("GET", "/api/auth/me").then(function (data) {
       if (data.needsSetup) return showSetup();
       if (!data.user) return showLogin();
@@ -157,7 +391,7 @@
     hideAllScreens();
     document.getElementById("app").hidden = false;
     document.getElementById("me-name").textContent = user.name || user.username;
-    document.getElementById("me-role").textContent = user.role === "admin" ? "Адміністратор" : "Співробітник";
+    document.getElementById("me-role").textContent = user.role === "admin" ? t("Адміністратор") : t("Співробітник");
     document.getElementById("me-avatar").textContent = (user.name || user.username).trim().slice(0, 1).toUpperCase();
     document.getElementById("nav-team").hidden = user.role !== "admin";
     document.getElementById("nav-inventory").hidden = user.role !== "admin";
@@ -176,7 +410,7 @@
       var badge = document.getElementById("btn-telegram");
       var text = document.getElementById("tg-badge-text");
       badge.classList.toggle("linked", !!info.linked);
-      text.textContent = "Telegram: " + (info.linked ? "підключено" : "не підключено");
+      text.textContent = "Telegram: " + (info.linked ? t("підключено") : t("не підключено"));
     }).catch(function () { /* not critical — leave the default label */ });
   }
 
@@ -185,9 +419,9 @@
     var info = state.telegram || {};
     root.innerHTML =
       '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
-        '<div class="modal-head"><h3>Сповіщення в Telegram</h3>' +
+        '<div class="modal-head"><h3>' + t("Сповіщення в Telegram") + '</h3>' +
           '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
-        '<div class="modal-body" id="tg-modal-body"><p class="auth-sub">Завантаження...</p></div>' +
+        '<div class="modal-body" id="tg-modal-body"><p class="auth-sub">' + t("Завантаження...") + '</p></div>' +
         '<div class="modal-foot"><span></span><span></span></div>' +
       '</div></div>';
     document.getElementById("ov-close").addEventListener("click", closeOverlay);
@@ -203,7 +437,7 @@
     var body = document.getElementById("tg-modal-body");
     if (!body) return;
     if (!info.configured) {
-      body.innerHTML = '<p class="auth-sub">Telegram-бот ще не налаштований адміністратором сервера. Зверніться до того, хто розгортав CRM.</p>';
+      body.innerHTML = '<p class="auth-sub">' + t("Telegram-бот ще не налаштований адміністратором сервера. Зверніться до того, хто розгортав CRM.") + '</p>';
       return;
     }
     // A fresh code doesn't unlink the account by itself — telegramChatId
@@ -213,16 +447,16 @@
     // and the person would have no code/link to actually act on.
     if (info.linked && !showCodeEvenIfLinked) {
       body.innerHTML =
-        '<p class="auth-sub" style="color:var(--success);">✅ Ваш акаунт під\'єднано — сповіщення про призначені завдання приходитимуть у Telegram.</p>' +
-        '<button class="btn btn-sm" id="tg-relink">Під\'єднати інший Telegram / переприв\'язати</button>';
+        '<p class="auth-sub" style="color:var(--success);">✅ ' + t("Ваш акаунт під'єднано — сповіщення про призначені завдання приходитимуть у Telegram.") + '</p>' +
+        '<button class="btn btn-sm" id="tg-relink">' + t("Під'єднати інший Telegram / переприв'язати") + '</button>';
     } else {
       body.innerHTML =
-        (info.linked ? '<p class="auth-sub">Щоб перепідключити на інший Telegram-акаунт, надішліть боту новий код нижче — щойно він це отримає, старий зв\'язок заміниться новим.</p>' :
-          '<p class="auth-sub">Натисніть кнопку нижче — відкриється Telegram і бот сам вас під\'єднає.</p>') +
-        (info.deepLink ? '<a class="btn btn-primary btn-block" href="' + info.deepLink + '" target="_blank" rel="noopener">Під\'єднати Telegram</a>' : '') +
-        '<p class="auth-sub" style="margin-top:14px;">Або вручну: напишіть боту' + (info.botUsername ? ' <b>@' + escapeHtml(info.botUsername) + '</b>' : '') + ' команду:</p>' +
+        (info.linked ? '<p class="auth-sub">' + t("Щоб перепідключити на інший Telegram-акаунт, надішліть боту новий код нижче — щойно він це отримає, старий зв'язок заміниться новим.") + '</p>' :
+          '<p class="auth-sub">' + t("Натисніть кнопку нижче — відкриється Telegram і бот сам вас під'єднає.") + '</p>') +
+        (info.deepLink ? '<a class="btn btn-primary btn-block" href="' + info.deepLink + '" target="_blank" rel="noopener">' + t("Під'єднати Telegram") + '</a>' : '') +
+        '<p class="auth-sub" style="margin-top:14px;">' + t("Або вручну: напишіть боту") + (info.botUsername ? ' <b>@' + escapeHtml(info.botUsername) + '</b>' : '') + t(" команду:") + '</p>' +
         '<div class="kv-row"><div class="v mono" style="font-size:18px;">/start ' + escapeHtml(info.linkCode || "") + '</div></div>' +
-        '<button class="btn btn-sm" id="tg-regen" style="margin-top:12px;">Новий код</button>';
+        '<button class="btn btn-sm" id="tg-regen" style="margin-top:12px;">' + t("Новий код") + '</button>';
     }
     var relink = document.getElementById("tg-relink");
     if (relink) relink.addEventListener("click", function () { renderTelegramModalBody(state.telegram || {}, true); });
@@ -253,7 +487,7 @@
     }).then(function (data) {
       enterApp(data.user);
     }).catch(function (err) {
-      errEl.textContent = err.message || "Не вдалося створити акаунт";
+      errEl.textContent = err.message || t("Не вдалося створити акаунт");
       errEl.hidden = false;
     });
   });
@@ -268,7 +502,7 @@
     }).then(function (data) {
       enterApp(data.user);
     }).catch(function (err) {
-      errEl.textContent = err.message || "Не вдалося увійти";
+      errEl.textContent = err.message || t("Не вдалося увійти");
       errEl.hidden = false;
     });
   });
@@ -305,7 +539,7 @@
       if (res[8]) state.dayPlans = new Map(res[8].map(function (d) { return [d.id, d]; }));
       render();
     }).catch(function (err) {
-      if (err && err.code !== "not_authenticated") toast(err.message || "Не вдалося оновити дані", true);
+      if (err && err.code !== "not_authenticated") toast(err.message || t("Не вдалося оновити дані"), true);
     });
   }
 
@@ -323,7 +557,7 @@
   /* ============ derived data ============ */
   function clientName(id) {
     var c = state.clients.get(id);
-    return c ? c.name : "(клієнт видалений)";
+    return c ? c.name : t("(клієнт видалений)");
   }
   function jobsSorted() {
     return Array.from(state.jobs.values()).slice().sort(function (a, b) { return (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")); });
@@ -346,17 +580,17 @@
     var upcoming = jobsSorted().filter(function (j) { return j.clientId === clientId && j.status === "scheduled" && j.date >= today; });
     return upcoming[0] || null;
   }
-  function statusLabelJob(s) { return { scheduled: "заплановано", done: "виконано", cancelled: "скасовано" }[s] || s; }
-  function statusLabelClient(s) { return { lead: "лід", active: "активний", inactive: "неактивний" }[s] || s; }
+  function statusLabelJob(s) { return { scheduled: t("заплановано"), done: t("виконано"), cancelled: t("скасовано") }[s] || s; }
+  function statusLabelClient(s) { return { lead: t("лід"), active: t("активний"), inactive: t("неактивний") }[s] || s; }
   function statusLabelInvoice(inv) {
-    if (isOverdue(inv)) return "прострочено";
-    return { unpaid: "неоплачено", paid: "оплачено" }[inv.status] || inv.status;
+    if (isOverdue(inv)) return t("прострочено");
+    return { unpaid: t("неоплачено"), paid: t("оплачено") }[inv.status] || inv.status;
   }
 
   /* ============ render: dashboard ============ */
   function renderDashboard() {
     var today = new Date();
-    document.getElementById("today-label").textContent = today.toLocaleDateString("uk-UA", { weekday: "long", day: "numeric", month: "long" });
+    document.getElementById("today-label").textContent = today.toLocaleDateString(state.lang === "de" ? "de-DE" : "uk-UA", { weekday: "long", day: "numeric", month: "long" });
 
     var jobs = jobsSorted();
     var todayS = todayStr();
@@ -378,8 +612,8 @@
     function sumPrice(list) { return list.reduce(function (s, j) { return s + (Number(j.price) || 0); }, 0); }
     var weekTotal = sumPrice(weekJobsF), weekPaid = sumPrice(weekJobsF.filter(function (j) { return j.paid; }));
     var monthTotal = sumPrice(monthJobsF), monthPaid = sumPrice(monthJobsF.filter(function (j) { return j.paid; }));
-    document.getElementById("fin-week").textContent = fmtMoney(weekTotal) + " (оплачено " + fmtMoney(weekPaid) + ")";
-    document.getElementById("fin-month").textContent = fmtMoney(monthTotal) + " (оплачено " + fmtMoney(monthPaid) + ")";
+    document.getElementById("fin-week").textContent = fmtMoney(weekTotal) + t(" (оплачено ") + fmtMoney(weekPaid) + ")";
+    document.getElementById("fin-month").textContent = fmtMoney(monthTotal) + t(" (оплачено ") + fmtMoney(monthPaid) + ")";
     var statMonthIncome = document.getElementById("stat-month-income");
     if (statMonthIncome) statMonthIncome.textContent = fmtMoney(monthTotal);
 
@@ -390,9 +624,9 @@
   }
 
   function renderCalendar() {
-    document.getElementById("cal-month-label").textContent = MONTHS[state.calMonth] + " " + state.calYear;
+    document.getElementById("cal-month-label").textContent = MONTHS[state.lang][state.calMonth] + " " + state.calYear;
     var dowRow = document.getElementById("cal-dow-row");
-    dowRow.innerHTML = DOW.map(function (d) { return '<div class="cal-dow">' + d + '</div>'; }).join("");
+    dowRow.innerHTML = DOW[state.lang].map(function (d) { return '<div class="cal-dow">' + d + '</div>'; }).join("");
 
     var first = new Date(state.calYear, state.calMonth, 1);
     var startOffset = (first.getDay() + 6) % 7;
@@ -452,13 +686,13 @@
   }
 
   function renderDayPlanList(items) {
-    if (!items.length) return '<div class="empty-note">На цей день ще немає пунктів плану.</div>';
+    if (!items.length) return '<div class="empty-note">' + t("На цей день ще немає пунктів плану.") + '</div>';
     return items.map(function (d) {
       return '<div class="platform-task-row">' +
-        '<button class="platform-task-check' + (d.done ? ' done' : '') + '" data-toggle-dayplan="' + d.id + '" title="' + (d.done ? "Позначити не виконано" : "Позначити виконано") + '">' +
+        '<button class="platform-task-check' + (d.done ? ' done' : '') + '" data-toggle-dayplan="' + d.id + '" title="' + (d.done ? t("Позначити не виконано") : t("Позначити виконано")) + '">' +
           '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></button>' +
         '<div class="platform-task-title' + (d.done ? ' done' : '') + '">' + escapeHtml(d.text) + '</div>' +
-        '<button class="icon-btn platform-task-remove" data-remove-dayplan="' + d.id + '" title="Видалити пункт">' +
+        '<button class="icon-btn platform-task-remove" data-remove-dayplan="' + d.id + '" title="' + t("Видалити пункт") + '">' +
           '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
       '</div>';
     }).join("");
@@ -495,7 +729,7 @@
 
     var date = dayPlanDate();
     var title = document.getElementById("dayplan-title");
-    if (title) title.textContent = "План на " + fmtDateHuman(date) + (date === todayStr() ? " (сьогодні)" : "");
+    if (title) title.textContent = t("План на ") + fmtDateHuman(date) + (date === todayStr() ? t(" (сьогодні)") : "");
 
     var list = document.getElementById("dayplan-list");
     if (list) {
@@ -536,15 +770,15 @@
     var jobs = jobsSorted().filter(function (j) { return j.status !== "cancelled"; });
     var items;
     if (state.selectedDay) {
-      titleEl.textContent = fmtDateHuman(state.selectedDay) + " — завдання";
+      titleEl.textContent = fmtDateHuman(state.selectedDay) + t(" — завдання");
       items = jobs.filter(function (j) { return j.date === state.selectedDay; });
     } else {
-      titleEl.textContent = "Найближчі завдання";
+      titleEl.textContent = t("Найближчі завдання");
       var todayS = todayStr();
       items = jobs.filter(function (j) { return j.date >= todayS; }).slice(0, 8);
     }
     if (!items.length) {
-      listEl.innerHTML = '<div class="empty-note">Немає запланованих завдань' + (state.selectedDay ? " на цей день" : "") + '.</div>';
+      listEl.innerHTML = '<div class="empty-note">' + t("Немає запланованих завдань") + (state.selectedDay ? t(" на цей день") : "") + '.</div>';
       return;
     }
     listEl.innerHTML = items.map(function (j) {
@@ -552,10 +786,10 @@
       return '<div class="agenda-item clickable" data-job="' + j.id + '" style="cursor:pointer;">' +
         '<div class="agenda-date">' + fmtDateHuman(j.date) + (j.time ? '<b>' + j.time + '</b>' : "") + '</div>' +
         '<div class="agenda-main"><div class="title">' + repeatIcon + escapeHtml(clientName(j.clientId)) + '</div>' +
-        '<div class="meta">' + escapeHtml(j.service || "") + (j.address ? " · " + escapeHtml(j.address) : "") + (assigneeName(j.assignedTo) ? " · 👤 " + escapeHtml(assigneeName(j.assignedTo)) : "") + '</div></div>' +
+        '<div class="meta">' + escapeHtml(j.service ? t(j.service) : "") + (j.address ? " · " + escapeHtml(j.address) : "") + (assigneeName(j.assignedTo) ? " · 👤 " + escapeHtml(assigneeName(j.assignedTo)) : "") + '</div></div>' +
         '<div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">' +
           '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span>' +
-          '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? "оплачено" : "не оплачено") + '</span>' +
+          '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? t("оплачено") : t("не оплачено")) + '</span>' +
         '</div></div>';
     }).join("");
     listEl.querySelectorAll("[data-job]").forEach(function (el) {
@@ -571,14 +805,14 @@
     var items = [];
     jobsSorted().forEach(function (j) {
       if (j.status === "scheduled" && j.date >= todayS && j.date <= soonS) {
-        items.push({ date: j.date, label: escapeHtml(clientName(j.clientId)) + " — " + escapeHtml(j.service || "завдання"), tone: "accent" });
+        items.push({ date: j.date, label: escapeHtml(clientName(j.clientId)) + " — " + escapeHtml(j.service ? t(j.service) : t("завдання")), tone: "accent" });
       }
     });
     invoicesList().forEach(function (i) {
-      if (isOverdue(i)) items.push({ date: i.dueDate, label: "Прострочено: " + escapeHtml(clientName(i.clientId)) + " · " + fmtMoney(i.amount), tone: "danger" });
+      if (isOverdue(i)) items.push({ date: i.dueDate, label: t("Прострочено: ") + escapeHtml(clientName(i.clientId)) + " · " + fmtMoney(i.amount), tone: "danger" });
     });
     items.sort(function (a, b) { return a.date.localeCompare(b.date); });
-    if (!items.length) { el.innerHTML = '<div class="empty-note">Нічого термінового — усе під контролем.</div>'; return; }
+    if (!items.length) { el.innerHTML = '<div class="empty-note">' + t("Нічого термінового — усе під контролем.") + '</div>'; return; }
     el.innerHTML = items.map(function (it) {
       return '<div class="agenda-item"><div class="agenda-date">' + fmtDateHuman(it.date) + '</div>' +
         '<div class="agenda-main"><div class="title" style="color:' + (it.tone === "danger" ? "var(--danger)" : "var(--text)") + ';">' + it.label + '</div></div></div>';
@@ -605,7 +839,7 @@
         '<td><div>' + escapeHtml(c.phone || "—") + '</div><div class="cell-sub">' + escapeHtml(c.email || "") + '</div></td>' +
         '<td><span class="pill ' + c.status + '"><span class="pill-dot"></span>' + statusLabelClient(c.status) + '</span></td>' +
         '<td>' + (nj ? fmtDateHuman(nj.date) + (nj.time ? ", " + nj.time : "") : '<span class="cell-sub">—</span>') + '</td>' +
-        '<td><div class="row-actions"><button class="icon-btn" data-edit-client="' + c.id + '" title="Редагувати"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button></div></td></tr>';
+        '<td><div class="row-actions"><button class="icon-btn" data-edit-client="' + c.id + '" title="' + t("Редагувати") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button></div></td></tr>';
     }).join("");
 
     document.getElementById("nav-count-clients").textContent = state.clients.size || "";
@@ -647,9 +881,9 @@
         '<td>' + fmtDateHuman(inv.dueDate) + '</td>' +
         '<td><span class="pill ' + statusClass + '"><span class="pill-dot"></span>' + statusLabelInvoice(inv) + '</span></td>' +
         '<td><div class="row-actions">' +
-          (inv.status === "unpaid" ? '<button class="btn btn-sm" data-mark-paid="' + inv.id + '">Позначити оплаченим</button>' : '<button class="btn btn-sm btn-ghost" data-mark-unpaid="' + inv.id + '">Скасувати оплату</button>') +
-          '<button class="icon-btn" data-edit-invoice="' + inv.id + '" title="Редагувати"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
-          '<button class="icon-btn" data-del-invoice="' + inv.id + '" title="Видалити"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button></div></td></tr>';
+          (inv.status === "unpaid" ? '<button class="btn btn-sm" data-mark-paid="' + inv.id + '">' + t("Позначити оплаченим") + '</button>' : '<button class="btn btn-sm btn-ghost" data-mark-unpaid="' + inv.id + '">' + t("Скасувати оплату") + '</button>') +
+          '<button class="icon-btn" data-edit-invoice="' + inv.id + '" title="' + t("Редагувати") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
+          '<button class="icon-btn" data-del-invoice="' + inv.id + '" title="' + t("Видалити") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button></div></td></tr>';
     }).join("");
 
     document.getElementById("nav-count-invoices").textContent = all.filter(function (i) { return i.status === "unpaid"; }).length || "";
@@ -669,14 +903,14 @@
     });
     tbody.querySelectorAll("[data-del-invoice]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        if (!confirm("Видалити цей рахунок?")) return;
+        if (!confirm(t("Видалити цей рахунок?"))) return;
         api("DELETE", "/api/invoices/" + btn.getAttribute("data-del-invoice")).then(function () { toast("Рахунок видалено"); loadAll(); });
       });
     });
   }
 
   function exportInvoicesCsv() {
-    var rows = [["Клієнт", "Опис", "Сума", "Термін оплати", "Статус", "Дата створення"]];
+    var rows = [[t("Клієнт"), t("Опис"), t("Сума"), t("Термін оплати"), t("Статус"), t("Дата створення")]];
     invoicesList().slice().sort(function (a, b) { return (a.issueDate || "").localeCompare(b.issueDate || ""); }).forEach(function (inv) {
       rows.push([
         clientName(inv.clientId),
@@ -710,16 +944,16 @@
     var tbody = document.getElementById("users-tbody");
     tbody.innerHTML = state.users.map(function (u) {
       return '<tr>' +
-        '<td class="cell-title">' + escapeHtml(u.name) + (u.id === state.me.id ? ' <span class="cell-sub">(ви)</span>' : '') + '</td>' +
+        '<td class="cell-title">' + escapeHtml(u.name) + (u.id === state.me.id ? ' <span class="cell-sub">' + t("(ви)") + '</span>' : '') + '</td>' +
         '<td class="mono">' + escapeHtml(u.username) + '</td>' +
-        '<td><span class="pill ' + u.role + '"><span class="pill-dot"></span>' + (u.role === "admin" ? "адмін" : "співробітник") + '</span></td>' +
-        '<td><span class="pill ' + (u.active ? "active" : "inactive") + '"><span class="pill-dot"></span>' + (u.active ? "активний" : "вимкнено") + '</span></td>' +
-        '<td>' + (u.telegramLinked ? '<span class="pill active"><span class="pill-dot"></span>підключено</span>' : '<span class="pill lead"><span class="pill-dot"></span>—</span>') + '</td>' +
+        '<td><span class="pill ' + u.role + '"><span class="pill-dot"></span>' + (u.role === "admin" ? t("адмін") : t("співробітник")) + '</span></td>' +
+        '<td><span class="pill ' + (u.active ? "active" : "inactive") + '"><span class="pill-dot"></span>' + (u.active ? t("активний") : t("вимкнено")) + '</span></td>' +
+        '<td>' + (u.telegramLinked ? '<span class="pill active"><span class="pill-dot"></span>' + t("підключено") + '</span>' : '<span class="pill lead"><span class="pill-dot"></span>—</span>') + '</td>' +
         '<td><div class="row-actions">' +
-          '<button class="btn btn-sm" data-reset-pw="' + u.id + '">Скинути пароль</button>' +
-          '<button class="btn btn-sm btn-ghost" data-toggle-role="' + u.id + '">' + (u.role === "admin" ? "Прибрати адміна" : "Зробити адміном") + '</button>' +
-          '<button class="btn btn-sm btn-ghost" data-toggle-active="' + u.id + '">' + (u.active ? "Вимкнути" : "Увімкнути") + '</button>' +
-          (u.id === state.me.id ? '' : '<button class="icon-btn" data-del-user="' + u.id + '" title="Видалити"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button>') +
+          '<button class="btn btn-sm" data-reset-pw="' + u.id + '">' + t("Скинути пароль") + '</button>' +
+          '<button class="btn btn-sm btn-ghost" data-toggle-role="' + u.id + '">' + (u.role === "admin" ? t("Прибрати адміна") : t("Зробити адміном")) + '</button>' +
+          '<button class="btn btn-sm btn-ghost" data-toggle-active="' + u.id + '">' + (u.active ? t("Вимкнути") : t("Увімкнути")) + '</button>' +
+          (u.id === state.me.id ? '' : '<button class="icon-btn" data-del-user="' + u.id + '" title="' + t("Видалити") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button>') +
         '</div></td></tr>';
     }).join("");
 
@@ -736,8 +970,8 @@
         var u = state.users.find(function (x) { return x.id === id; });
         var nextRole = u.role === "admin" ? "employee" : "admin";
         var msg = nextRole === "admin"
-          ? "Призначити " + u.name + " адміністратором?"
-          : "Прибрати права адміністратора в " + u.name + "?";
+          ? t("Призначити ") + u.name + t(" адміністратором?")
+          : t("Прибрати права адміністратора в ") + u.name + t("?");
         if (!confirm(msg)) return;
         api("PATCH", "/api/users/" + id, { role: nextRole }).then(function () { toast("Роль оновлено"); loadAll(); }).catch(function (err) { toast(err.message, true); });
       });
@@ -751,14 +985,14 @@
     });
     tbody.querySelectorAll("[data-del-user]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        if (!confirm("Видалити цей обліковий запис?")) return;
+        if (!confirm(t("Видалити цей обліковий запис?"))) return;
         api("DELETE", "/api/users/" + btn.getAttribute("data-del-user")).then(function () { toast("Акаунт видалено"); loadAll(); }).catch(function (err) { toast(err.message, true); });
       });
     });
   }
 
   /* ============ render: development plan ============ */
-  function statusLabelRoadmap(s) { return { backlog: "заплановано", in_progress: "в процесі", done: "готово" }[s] || s; }
+  function statusLabelRoadmap(s) { return { backlog: t("заплановано"), in_progress: t("в процесі"), done: t("готово") }[s] || s; }
 
   function renderRoadmap() {
     var items = roadmapList();
@@ -783,10 +1017,10 @@
           '<div class="roadmap-card-title">' + escapeHtml(r.title) + '</div>' +
           (r.description ? '<div class="roadmap-card-desc">' + renderDescLines(r.description) + '</div>' : '') +
           (isAdmin ? '<div class="roadmap-card-actions">' +
-            (status !== "backlog" ? '<button class="btn-chip" data-move="backlog" data-id="' + r.id + '">← заплановано</button>' : '') +
-            (status !== "in_progress" ? '<button class="btn-chip" data-move="in_progress" data-id="' + r.id + '">в процесі</button>' : '') +
-            (status !== "done" ? '<button class="btn-chip" data-move="done" data-id="' + r.id + '">готово →</button>' : '') +
-            '<button class="icon-btn" data-edit-roadmap="' + r.id + '" title="Редагувати"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
+            (status !== "backlog" ? '<button class="btn-chip" data-move="backlog" data-id="' + r.id + '">' + t("← заплановано") + '</button>' : '') +
+            (status !== "in_progress" ? '<button class="btn-chip" data-move="in_progress" data-id="' + r.id + '">' + t("в процесі") + '</button>' : '') +
+            (status !== "done" ? '<button class="btn-chip" data-move="done" data-id="' + r.id + '">' + t("готово →") + '</button>' : '') +
+            '<button class="icon-btn" data-edit-roadmap="' + r.id + '" title="' + t("Редагувати") + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
           '</div>' : '') +
         '</div>';
       }).join("");
@@ -812,18 +1046,18 @@
     var root = document.getElementById("modal-root");
     root.innerHTML =
       '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
-        '<div class="modal-head"><h3>' + (r ? "Редагувати пункт" : "Новий пункт плану") + '</h3>' +
+        '<div class="modal-head"><h3>' + (r ? t("Редагувати пункт") : t("Новий пункт плану")) + '</h3>' +
           '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
         '<div class="modal-body">' +
-          '<div class="field"><label>Назва *</label><input type="text" id="f-title" value="' + (r ? escapeHtml(r.title) : "") + '" placeholder="Напр. Клієнтський портал"></div>' +
-          '<div class="field"><label>Опис</label><textarea id="f-desc" placeholder="Коротко, що це і навіщо">' + (r ? escapeHtml(r.description || "") : "") + '</textarea></div>' +
-          '<div class="field"><label>Статус</label><select id="f-status">' +
-            '<option value="backlog"' + (!r || r.status === "backlog" ? " selected" : "") + '>Заплановано</option>' +
-            '<option value="in_progress"' + (r && r.status === "in_progress" ? " selected" : "") + '>В процесі</option>' +
-            '<option value="done"' + (r && r.status === "done" ? " selected" : "") + '>Готово</option>' +
+          '<div class="field"><label>' + t("Назва *") + '</label><input type="text" id="f-title" value="' + (r ? escapeHtml(r.title) : "") + '" placeholder="' + t("Напр. Клієнтський портал") + '"></div>' +
+          '<div class="field"><label>' + t("Опис") + '</label><textarea id="f-desc" placeholder="' + t("Коротко, що це і навіщо") + '">' + (r ? escapeHtml(r.description || "") : "") + '</textarea></div>' +
+          '<div class="field"><label>' + t("Статус") + '</label><select id="f-status">' +
+            '<option value="backlog"' + (!r || r.status === "backlog" ? " selected" : "") + '>' + t("Заплановано") + '</option>' +
+            '<option value="in_progress"' + (r && r.status === "in_progress" ? " selected" : "") + '>' + t("В процесі") + '</option>' +
+            '<option value="done"' + (r && r.status === "done" ? " selected" : "") + '>' + t("Готово") + '</option>' +
           '</select></div>' +
         '</div>' +
-        '<div class="modal-foot">' + (r ? '<button class="btn btn-danger-text" id="ov-delete">Видалити</button>' : '<span></span>') + '<button class="btn btn-primary" id="ov-save">Зберегти</button></div>' +
+        '<div class="modal-foot">' + (r ? '<button class="btn btn-danger-text" id="ov-delete">' + t("Видалити") + '</button>' : '<span></span>') + '<button class="btn btn-primary" id="ov-save">' + t("Зберегти") + '</button></div>' +
       '</div></div>';
 
     document.getElementById("ov-close").addEventListener("click", closeOverlay);
@@ -837,12 +1071,12 @@
         status: document.getElementById("f-status").value
       };
       var req = r ? api("PATCH", "/api/roadmap/" + r.id, data) : api("POST", "/api/roadmap", data);
-      req.then(function () { toast(r ? "Пункт оновлено" : "Пункт додано"); closeOverlay(); loadAll(); })
+      req.then(function () { toast(r ? t("Пункт оновлено") : t("Пункт додано")); closeOverlay(); loadAll(); })
         .catch(function (err) { toast(err.message, true); });
     });
     if (r) {
       document.getElementById("ov-delete").addEventListener("click", function () {
-        if (!confirm('Видалити пункт "' + r.title + '" з плану розвитку?')) return;
+        if (!confirm(t("Видалити пункт \"") + r.title + t("\" з плану розвитку?"))) return;
         api("DELETE", "/api/roadmap/" + r.id).then(function () { toast("Пункт видалено"); closeOverlay(); loadAll(); });
       });
     }
@@ -878,41 +1112,41 @@
     if (emptyNote) {
       emptyNote.hidden = items.length > 0 || (state.ordersTab === "manual" && isAdmin);
       emptyNote.textContent = state.ordersTab === "auto"
-        ? "Рекомендованих платформ ще немає."
-        : "Платформ ще немає — додай першу кнопкою вище.";
+        ? t("Рекомендованих платформ ще немає.")
+        : t("Платформ ще немає — додай першу кнопкою вище.");
     }
 
     var html = items.map(function (p) {
-      var initial = (p.title || "?").trim().charAt(0).toUpperCase();
+      var initial = (p.title || t("?")).trim().charAt(0).toUpperCase();
       return '<a class="widget-card' + (p.done ? ' is-done' : '') + '" href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener noreferrer">' +
-        (isAdmin ? '<button class="icon-btn widget-edit" data-edit-platform="' + p.id + '" title="Редагувати"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' : '') +
+        (isAdmin ? '<button class="icon-btn widget-edit" data-edit-platform="' + p.id + '" title="' + t("Редагувати") + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' : '') +
         '<div class="widget-badge" style="background:' + widgetColor(p.title) + '">' + escapeHtml(initial) + '</div>' +
         '<div class="widget-title">' + escapeHtml(p.title) + '</div>' +
         '<' + (isAdmin ? 'button' : 'span') + ' class="widget-status' + (p.done ? ' done' : '') + '"' +
-          (isAdmin ? ' data-toggle-platform="' + p.id + '" title="Позначити ' + (p.done ? "не виконано" : "виконано") + '"' : '') + '>' +
+          (isAdmin ? ' data-toggle-platform="' + p.id + '" title="' + (p.done ? t("Позначити не виконано") : t("Позначити виконано")) + '"' : '') + '>' +
           '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 13l4 4L19 7"/></svg>' +
-          (p.done ? "Виконано" : "Не виконано") +
+          (p.done ? t("Виконано") : t("Не виконано")) +
         '</' + (isAdmin ? 'button' : 'span') + '>' +
         (isAdmin
-          ? '<input type="text" class="widget-personal-note" data-note-input="' + p.id + '" value="' + escapeHtml(p.note || "") + '" placeholder="Нотатка для себе...">'
+          ? '<input type="text" class="widget-personal-note" data-note-input="' + p.id + '" value="' + escapeHtml(p.note || "") + '" placeholder="' + t("Нотатка для себе...") + '">'
           : (p.note ? '<div class="widget-personal-note is-readonly">' + escapeHtml(p.note) + '</div>' : '')) +
         (isAdmin
           ? '<button class="widget-tasks-toggle" data-toggle-tasks="' + p.id + '" type="button">' + tasksToggleLabel(p) + '</button>' +
             '<div class="widget-tasks-panel" id="widget-tasks-panel-' + p.id + '" hidden>' +
               '<div class="platform-tasks" id="widget-tasks-list-' + p.id + '">' + renderPlatformTasks(p, "card-" + p.id + "-") + '</div>' +
               '<div class="platform-notes-add">' +
-                '<input type="text" id="widget-new-task-' + p.id + '" placeholder="Нове завдання...">' +
-                '<button class="btn btn-sm" data-add-card-task="' + p.id + '" type="button">Додати</button>' +
+                '<input type="text" id="widget-new-task-' + p.id + '" placeholder="' + t("Нове завдання...") + '">' +
+                '<button class="btn btn-sm" data-add-card-task="' + p.id + '" type="button">' + t("Додати") + '</button>' +
               '</div>' +
             '</div>'
           : '') +
-        '<div class="widget-open">Відкрити <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17 17 7M9 7h8v8"/></svg></div>' +
+        '<div class="widget-open">' + t("Відкрити") + ' <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17 17 7M9 7h8v8"/></svg></div>' +
       '</a>';
     }).join("");
 
     if (isAdmin && state.ordersTab === "manual") {
       html += '<button class="widget-card-add" id="btn-new-order-tile">' +
-        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Додати платформу</button>';
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>' + t("Додати платформу") + '</button>';
     }
     grid.innerHTML = html;
 
@@ -931,9 +1165,9 @@
           .then(function (updated) {
             state.platforms.set(pid, updated);
             btn.classList.toggle("done", !!updated.done);
-            btn.title = "Позначити " + (updated.done ? "не виконано" : "виконано");
+            btn.title = t("Позначити ") + (updated.done ? "не виконано" : t("виконано"));
             btn.closest(".widget-card").classList.toggle("is-done", !!updated.done);
-            var label = updated.done ? "Виконано" : "Не виконано";
+            var label = updated.done ? t("Виконано") : t("Не виконано");
             btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 13l4 4L19 7"/></svg>' + label;
           })
           .catch(function (err) { toast(err.message, true); });
@@ -1011,12 +1245,12 @@
   function renderPlatformNotes(p) {
     var notes = Array.isArray(p.notes) ? p.notes.slice() : [];
     if (p.note && p.note.trim()) notes.unshift({ id: "__legacy", text: p.note, createdAt: p.createdAt });
-    if (!notes.length) return '<div class="empty-note">Записів ще немає.</div>';
+    if (!notes.length) return '<div class="empty-note">' + t("Записів ще немає.") + '</div>';
     return notes.map(function (n) {
       return '<div class="platform-note-row">' +
         '<div class="platform-note-text">' + escapeHtml(n.text) +
           '<span class="platform-note-meta">' + fmtDateHuman((n.createdAt || "").slice(0, 10)) + '</span></div>' +
-        '<button class="icon-btn platform-note-remove" data-remove-note="' + escapeHtml(n.id) + '" title="Видалити запис">' +
+        '<button class="icon-btn platform-note-remove" data-remove-note="' + escapeHtml(n.id) + '" title="' + t("Видалити запис") + '">' +
           '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
       '</div>';
     }).join("");
@@ -1040,12 +1274,12 @@
     });
   }
 
-  function renderTaskHistory(t) {
-    var hist = Array.isArray(t.history) ? t.history.slice().reverse() : [];
-    if (!hist.length) return '<div class="empty-note">Немає історії.</div>';
+  function renderTaskHistory(task) {
+    var hist = Array.isArray(task.history) ? task.history.slice().reverse() : [];
+    if (!hist.length) return '<div class="empty-note">' + t("Немає історії.") + '</div>';
     return hist.map(function (h) {
       var d = h.changedAt || "";
-      return '<div class="platform-task-history-row"><span>' + (h.done ? "Виконано" : "Не виконано") + '</span>' +
+      return '<div class="platform-task-history-row"><span>' + (h.done ? t("Виконано") : t("Не виконано")) + '</span>' +
         '<span class="platform-note-meta">' + fmtDateHuman(d.slice(0, 10)) + (d.length >= 16 ? " " + d.slice(11, 16) : "") + '</span></div>';
     }).join("");
   }
@@ -1056,17 +1290,17 @@
   function renderPlatformTasks(p, idPrefix) {
     idPrefix = idPrefix || "task-history-";
     var tasks = Array.isArray(p.tasks) ? p.tasks : [];
-    if (!tasks.length) return '<div class="empty-note">Завдань ще немає.</div>';
-    return tasks.map(function (t) {
+    if (!tasks.length) return '<div class="empty-note">' + t("Завдань ще немає.") + '</div>';
+    return tasks.map(function (tk) {
       return '<div class="platform-task-row">' +
-        '<button class="platform-task-check' + (t.done ? ' done' : '') + '" data-toggle-task="' + escapeHtml(t.id) + '" title="' + (t.done ? "Позначити не виконано" : "Позначити виконано") + '">' +
+        '<button class="platform-task-check' + (tk.done ? ' done' : '') + '" data-toggle-task="' + escapeHtml(tk.id) + '" title="' + (tk.done ? t("Позначити не виконано") : t("Позначити виконано")) + '">' +
           '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></button>' +
-        '<div class="platform-task-title' + (t.done ? ' done' : '') + '">' + escapeHtml(t.title) + '</div>' +
-        '<button class="icon-btn platform-task-history" data-history-task="' + escapeHtml(t.id) + '" title="Історія статусу">' +
+        '<div class="platform-task-title' + (tk.done ? ' done' : '') + '">' + escapeHtml(tk.title) + '</div>' +
+        '<button class="icon-btn platform-task-history" data-history-task="' + escapeHtml(tk.id) + '" title="' + t("Історія статусу") + '">' +
           '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></button>' +
-        '<button class="icon-btn platform-task-remove" data-remove-task="' + escapeHtml(t.id) + '" title="Видалити завдання">' +
+        '<button class="icon-btn platform-task-remove" data-remove-task="' + escapeHtml(tk.id) + '" title="' + t("Видалити завдання") + '">' +
           '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
-        '<div class="platform-task-history-panel" id="' + idPrefix + escapeHtml(t.id) + '" hidden></div>' +
+        '<div class="platform-task-history-panel" id="' + idPrefix + escapeHtml(tk.id) + '" hidden></div>' +
       '</div>';
     }).join("");
   }
@@ -1139,7 +1373,7 @@
   function tasksToggleLabel(p) {
     var c = taskCounts(p);
     return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' +
-      ' Завдання' + (c.total ? ' (' + c.done + '/' + c.total + ')' : '');
+      t(" Завдання") + (c.total ? ' (' + c.done + '/' + c.total + ')' : '');
   }
 
   function openPlatformModal(id) {
@@ -1147,26 +1381,26 @@
     var root = document.getElementById("modal-root");
     root.innerHTML =
       '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
-        '<div class="modal-head"><h3>' + (p ? "Редагувати платформу" : "Нова платформа") + '</h3>' +
+        '<div class="modal-head"><h3>' + (p ? t("Редагувати платформу") : t("Нова платформа")) + '</h3>' +
           '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
         '<div class="modal-body">' +
-          '<div class="field"><label>Назва *</label><input type="text" id="f-title" value="' + (p ? escapeHtml(p.title) : "") + '" placeholder="Напр. Helpling"></div>' +
-          '<div class="field"><label>Посилання *</label><input type="text" id="f-url" value="' + (p ? escapeHtml(p.url) : "") + '" placeholder="https://..."></div>' +
+          '<div class="field"><label>' + t("Назва *") + '</label><input type="text" id="f-title" value="' + (p ? escapeHtml(p.title) : "") + '" placeholder="' + t("Напр. Helpling") + '"></div>' +
+          '<div class="field"><label>' + t("Посилання *") + '</label><input type="text" id="f-url" value="' + (p ? escapeHtml(p.url) : "") + '" placeholder="https://..."></div>' +
           (p ?
-            '<div class="field"><label>Завдання</label>' +
+            '<div class="field"><label>' + t("Завдання") + '</label>' +
               '<div class="platform-tasks" id="platform-tasks-list">' + renderPlatformTasks(p) + '</div>' +
-              '<div class="platform-notes-add"><input type="text" id="f-new-task" placeholder="Нове завдання, напр. «Реєстрація»"><button class="btn btn-sm" id="ov-add-task" type="button">Додати</button></div>' +
+              '<div class="platform-notes-add"><input type="text" id="f-new-task" placeholder="' + t("Нове завдання, напр. «Реєстрація»") + '"><button class="btn btn-sm" id="ov-add-task" type="button">' + t("Додати") + '</button></div>' +
             '</div>'
             : '') +
           (p ?
-            '<div class="field"><label>Нотатки</label>' +
+            '<div class="field"><label>' + t("Нотатки") + '</label>' +
               '<div class="platform-notes" id="platform-notes-list">' + renderPlatformNotes(p) + '</div>' +
-              '<div class="platform-notes-add"><input type="text" id="f-new-note" placeholder="Додати запис, напр. «Зареєструвався», «3 замовлення»"><button class="btn btn-sm" id="ov-add-note" type="button">Додати</button></div>' +
+              '<div class="platform-notes-add"><input type="text" id="f-new-note" placeholder="' + t("Додати запис, напр. «Зареєструвався», «3 замовлення»") + '"><button class="btn btn-sm" id="ov-add-note" type="button">' + t("Додати") + '</button></div>' +
             '</div>'
-            : '<div class="field"><label>Нотатка</label><input type="text" id="f-note" placeholder="Коротко, навіщо (необов\'язково)"></div>') +
-          '<label class="checkbox-field"><input type="checkbox" id="f-done"' + (p && p.done ? " checked" : "") + '> Реєстрацію вже виконано</label>' +
+            : '<div class="field"><label>' + t("Нотатка") + '</label><input type="text" id="f-note" placeholder="' + t("Коротко, навіщо (необов'язково)") + '"></div>') +
+          '<label class="checkbox-field"><input type="checkbox" id="f-done"' + (p && p.done ? " checked" : "") + '> ' + t("Реєстрацію вже виконано") + '</label>' +
         '</div>' +
-        '<div class="modal-foot">' + (p ? '<button class="btn btn-danger-text" id="ov-delete">Видалити</button>' : '<span></span>') + '<button class="btn btn-primary" id="ov-save">Зберегти</button></div>' +
+        '<div class="modal-foot">' + (p ? '<button class="btn btn-danger-text" id="ov-delete">' + t("Видалити") + '</button>' : '<span></span>') + '<button class="btn btn-primary" id="ov-save">' + t("Зберегти") + '</button></div>' +
       '</div></div>';
 
     document.getElementById("ov-close").addEventListener("click", closeOverlay);
@@ -1179,12 +1413,12 @@
       var data = { title: title, url: url, done: document.getElementById("f-done").checked };
       if (!p) data.note = document.getElementById("f-note").value.trim();
       var req = p ? api("PATCH", "/api/platforms/" + p.id, data) : api("POST", "/api/platforms", data);
-      req.then(function () { toast(p ? "Платформу оновлено" : "Платформу додано"); closeOverlay(); loadAll(); })
+      req.then(function () { toast(p ? t("Платформу оновлено") : t("Платформу додано")); closeOverlay(); loadAll(); })
         .catch(function (err) { toast(err.message, true); });
     });
     if (p) {
       document.getElementById("ov-delete").addEventListener("click", function () {
-        if (!confirm('Видалити віджет "' + p.title + '"?')) return;
+        if (!confirm(t("Видалити") + t(" віджет \"") + p.title + '"?')) return;
         api("DELETE", "/api/platforms/" + p.id).then(function () { toast("Платформу видалено"); closeOverlay(); loadAll(); });
       });
       wirePlatformTasks(p.id);
@@ -1236,23 +1470,23 @@
     var root = document.getElementById("modal-root");
     root.innerHTML =
       '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
-        '<div class="modal-head"><h3>' + (id ? "Редагувати клієнта" : "Новий клієнт") + '</h3>' +
+        '<div class="modal-head"><h3>' + (id ? t("Редагувати клієнта") : t("Новий клієнт")) + '</h3>' +
           '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
         '<div class="modal-body">' +
-          '<div class="field"><label>Ім\'я / назва *</label><input type="text" id="f-name" value="' + escapeHtml(c.name) + '" placeholder="Напр. Анна Шмідт"></div>' +
+          '<div class="field"><label>' + t("Ім'я / назва *") + '</label><input type="text" id="f-name" value="' + escapeHtml(c.name) + '" placeholder="' + t("Напр. Анна Шмідт") + '"></div>' +
           '<div class="field-row">' +
-            '<div class="field"><label>Телефон</label><input type="tel" id="f-phone" value="' + escapeHtml(c.phone) + '" placeholder="+49 ..."></div>' +
+            '<div class="field"><label>' + t("Телефон") + '</label><input type="tel" id="f-phone" value="' + escapeHtml(c.phone) + '" placeholder="+49 ..."></div>' +
             '<div class="field"><label>Email</label><input type="email" id="f-email" value="' + escapeHtml(c.email) + '"></div>' +
           '</div>' +
-          '<div class="field"><label>Адреса</label><input type="text" id="f-address" value="' + escapeHtml(c.address) + '" placeholder="Вулиця, місто"></div>' +
-          '<div class="field"><label>Статус</label><select id="f-status">' +
+          '<div class="field"><label>' + t("Адреса") + '</label><input type="text" id="f-address" value="' + escapeHtml(c.address) + '" placeholder="' + t("Вулиця, місто") + '"></div>' +
+          '<div class="field"><label>' + t("Статус") + '</label><select id="f-status">' +
             ["lead", "active", "inactive"].map(function (s) { return '<option value="' + s + '"' + (c.status === s ? " selected" : "") + '>' + statusLabelClient(s) + '</option>'; }).join("") +
           '</select></div>' +
-          '<div class="field"><label>Нотатки</label><textarea id="f-notes" placeholder="Особливості об\'єкта, домовленості...">' + escapeHtml(c.notes) + '</textarea></div>' +
+          '<div class="field"><label>' + t("Нотатки") + '</label><textarea id="f-notes" placeholder="' + t("Особливості об'єкта, домовленості...") + '">' + escapeHtml(c.notes) + '</textarea></div>' +
         '</div>' +
         '<div class="modal-foot">' +
-          (id ? '<button class="btn btn-danger-text" id="ov-delete">Видалити клієнта</button>' : '<span></span>') +
-          '<button class="btn btn-primary" id="ov-save">Зберегти</button>' +
+          (id ? '<button class="btn btn-danger-text" id="ov-delete">' + t("Видалити клієнта") + '</button>' : '<span></span>') +
+          '<button class="btn btn-primary" id="ov-save">' + t("Зберегти") + '</button>' +
         '</div></div></div>';
 
     document.getElementById("ov-close").addEventListener("click", closeOverlay);
@@ -1269,12 +1503,12 @@
         notes: document.getElementById("f-notes").value.trim()
       };
       var req = id ? api("PATCH", "/api/clients/" + id, data) : api("POST", "/api/clients", data);
-      req.then(function () { toast(id ? "Клієнта оновлено" : "Клієнта додано"); closeOverlay(); loadAll(); })
+      req.then(function () { toast(id ? t("Клієнта оновлено") : t("Клієнта додано")); closeOverlay(); loadAll(); })
          .catch(function (err) { toast(err.message, true); });
     });
     if (id) {
       document.getElementById("ov-delete").addEventListener("click", function () {
-        if (!confirm("Видалити клієнта \"" + c.name + "\"? Пов'язані завдання й рахунки залишаться в системі.")) return;
+        if (!confirm(t("Видалити клієнта \"") + c.name + t("\"? Пов'язані завдання й рахунки залишаться в системі."))) return;
         api("DELETE", "/api/clients/" + id).then(function () { toast("Клієнта видалено"); closeOverlay(); loadAll(); });
       });
     }
@@ -1292,24 +1526,24 @@
         '<div class="drawer-head"><div><h3>' + escapeHtml(c.name) + '</h3><span class="pill ' + c.status + '" style="margin-top:6px;"><span class="pill-dot"></span>' + statusLabelClient(c.status) + '</span></div>' +
           '<button class="icon-btn" id="dr-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
         '<div class="drawer-body">' +
-          '<div class="drawer-section"><h4>Контакти</h4><div class="kv">' +
-            '<div class="kv-row"><div class="k">Телефон</div><div class="v">' + escapeHtml(c.phone || "—") + '</div></div>' +
+          '<div class="drawer-section"><h4>' + t("Контакти") + '</h4><div class="kv">' +
+            '<div class="kv-row"><div class="k">' + t("Телефон") + '</div><div class="v">' + escapeHtml(c.phone || "—") + '</div></div>' +
             '<div class="kv-row"><div class="k">Email</div><div class="v">' + escapeHtml(c.email || "—") + '</div></div>' +
-            '<div class="kv-row"><div class="k">Адреса</div><div class="v">' + escapeHtml(c.address || "—") + '</div></div></div></div>' +
-          (c.notes ? '<div class="drawer-section"><h4>Нотатки</h4><div style="font-size:13px;">' + escapeHtml(c.notes) + '</div></div>' : '') +
-          '<div class="drawer-section"><h4 style="display:flex; justify-content:space-between; align-items:center;">Завдання <button class="btn btn-sm" id="dr-add-job">+ Додати</button></h4>' +
+            '<div class="kv-row"><div class="k">' + t("Адреса") + '</div><div class="v">' + escapeHtml(c.address || "—") + '</div></div></div></div>' +
+          (c.notes ? '<div class="drawer-section"><h4>' + t("Нотатки") + '</h4><div style="font-size:13px;">' + escapeHtml(c.notes) + '</div></div>' : '') +
+          '<div class="drawer-section"><h4 style="display:flex; justify-content:space-between; align-items:center;">' + t("Завдання") + ' <button class="btn btn-sm" id="dr-add-job">' + t("+ Додати") + '</button></h4>' +
             (history.length ? history.map(function (j) {
               var repeatIcon = j.seriesId ? '🔁 ' : '';
-              return '<div class="job-row"><div class="agenda-date">' + fmtDateHuman(j.date) + '</div><div class="agenda-main"><div class="title">' + repeatIcon + escapeHtml(j.service || "") + '</div></div>' +
+              return '<div class="job-row"><div class="agenda-date">' + fmtDateHuman(j.date) + '</div><div class="agenda-main"><div class="title">' + repeatIcon + escapeHtml(j.service ? t(j.service) : "") + '</div></div>' +
                 '<div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">' +
                   '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span>' +
-                  '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? "оплачено" : "не оплачено") + '</span>' +
+                  '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? t("оплачено") : t("не оплачено")) + '</span>' +
                 '</div></div>';
-            }).join("") : '<div class="empty-note">Ще немає завдань</div>') + '</div>' +
-          '<div class="drawer-section"><h4 style="display:flex; justify-content:space-between; align-items:center;">Рахунки <button class="btn btn-sm" id="dr-add-invoice">+ Додати</button></h4>' +
+            }).join("") : '<div class="empty-note">' + t("Ще немає завдань") + '</div>') + '</div>' +
+          '<div class="drawer-section"><h4 style="display:flex; justify-content:space-between; align-items:center;">' + t("Рахунки") + ' <button class="btn btn-sm" id="dr-add-invoice">' + t("+ Додати") + '</button></h4>' +
             (invs.length ? invs.map(function (i) {
               return '<div class="job-row"><div class="agenda-main"><div class="title">' + fmtMoney(i.amount) + '</div><div class="meta">' + escapeHtml(i.note || "") + '</div></div><span class="pill ' + (isOverdue(i) ? "overdue" : i.status) + '"><span class="pill-dot"></span>' + statusLabelInvoice(i) + '</span></div>';
-            }).join("") : '<div class="empty-note">Ще немає рахунків</div>') + '</div>' +
+            }).join("") : '<div class="empty-note">' + t("Ще немає рахунків") + '</div>') + '</div>' +
         '</div></div>';
 
     function close() { root.innerHTML = ""; }
@@ -1332,48 +1566,48 @@
     var root = document.getElementById("modal-root");
     root.innerHTML =
       '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
-        '<div class="modal-head"><h3>' + (id ? "Редагувати завдання" : "Нове завдання") + '</h3>' +
+        '<div class="modal-head"><h3>' + (id ? t("Редагувати завдання") : t("Нове завдання")) + '</h3>' +
           '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
         '<div class="modal-body">' +
-          '<div class="field"><label>Клієнт *</label><select id="f-client">' + clientOptionsHtml(j.clientId) + '</select></div>' +
+          '<div class="field"><label>' + t("Клієнт *") + '</label><select id="f-client">' + clientOptionsHtml(j.clientId) + '</select></div>' +
           '<div class="field-row">' +
-            '<div class="field"><label>Дата *</label><input type="date" id="f-date" value="' + j.date + '"></div>' +
-            '<div class="field"><label>Час</label><input type="time" id="f-time" value="' + (j.time || "") + '"></div></div>' +
-          '<div class="field"><label>Тип послуги</label><select id="f-service">' +
-            SERVICE_TYPES.map(function (s) { return '<option' + (j.service === s ? " selected" : "") + '>' + s + '</option>'; }).join("") + '</select></div>' +
-          '<div class="field"><label>Адреса об\'єкта</label><input type="text" id="f-address" value="' + escapeHtml(j.address) + '"></div>' +
+            '<div class="field"><label>' + t("Дата *") + '</label><input type="date" id="f-date" value="' + j.date + '"></div>' +
+            '<div class="field"><label>' + t("Час") + '</label><input type="time" id="f-time" value="' + (j.time || "") + '"></div></div>' +
+          '<div class="field"><label>' + t("Тип послуги") + '</label><select id="f-service">' +
+            SERVICE_TYPES.map(function (s) { return '<option value="' + escapeHtml(s) + '"' + (j.service === s ? " selected" : "") + '>' + escapeHtml(t(s)) + '</option>'; }).join("") + '</select></div>' +
+          '<div class="field"><label>' + t("Адреса об'єкта") + '</label><input type="text" id="f-address" value="' + escapeHtml(j.address) + '"></div>' +
           '<div class="field-row">' +
-            '<div class="field"><label>Вартість, €</label><input type="number" id="f-price" value="' + escapeHtml(j.price) + '" min="0" step="1"></div>' +
-            '<div class="field"><label>Статус</label><select id="f-status">' +
+            '<div class="field"><label>' + t("Вартість, €") + '</label><input type="number" id="f-price" value="' + escapeHtml(j.price) + '" min="0" step="1"></div>' +
+            '<div class="field"><label>' + t("Статус") + '</label><select id="f-status">' +
               ["scheduled", "done", "cancelled"].map(function (s) { return '<option value="' + s + '"' + (j.status === s ? " selected" : "") + '>' + statusLabelJob(s) + '</option>'; }).join("") + '</select></div></div>' +
-          '<div class="field"><label>Виконавець</label><select id="f-assignee"><option value="">— не призначено —</option>' +
+          '<div class="field"><label>' + t("Виконавець") + '</label><select id="f-assignee"><option value="">' + t("— не призначено —") + '</option>' +
             state.roster.map(function (u) {
-              var tag = (u.role === "admin" ? " (адмін)" : "") + (u.telegramLinked ? " · Telegram ✓" : " · без Telegram");
+              var tag = (u.role === "admin" ? t(" (адмін)") : "") + (u.telegramLinked ? " · Telegram ✓" : t(" · без Telegram"));
               return '<option value="' + u.id + '"' + (j.assignedTo === u.id ? " selected" : "") + '>' + escapeHtml(u.name) + tag + '</option>';
             }).join("") +
           '</select>' +
-          '<p class="auth-sub" style="margin-top:6px;">"· без Telegram" — сповіщення про призначення не дійде, доки людина не під\'єднає бота.</p></div>' +
+          '<p class="auth-sub" style="margin-top:6px;">' + t("\"· без Telegram\" — сповіщення про призначення не дійде, доки людина не під'єднає бота.") + '</p></div>' +
           '<div class="field-row">' +
-            '<div class="field"><label>Оплата</label><select id="f-paid">' +
-              '<option value="false"' + (!j.paid ? " selected" : "") + '>не оплачено</option>' +
-              '<option value="true"' + (j.paid ? " selected" : "") + '>оплачено</option>' +
+            '<div class="field"><label>' + t("Оплата") + '</label><select id="f-paid">' +
+              '<option value="false"' + (!j.paid ? " selected" : "") + '>' + t("не оплачено") + '</option>' +
+              '<option value="true"' + (j.paid ? " selected" : "") + '>' + t("оплачено") + '</option>' +
             '</select></div>' +
-            '<div class="field"><label>Повторення</label><select id="f-recur-freq">' +
-              '<option value="">не повторюється</option>' +
-              '<option value="weekly"' + (j.recurrence && j.recurrence.freq === "weekly" ? " selected" : "") + '>щотижня</option>' +
-              '<option value="biweekly"' + (j.recurrence && j.recurrence.freq === "biweekly" ? " selected" : "") + '>що 2 тижні</option>' +
-              '<option value="monthly"' + (j.recurrence && j.recurrence.freq === "monthly" ? " selected" : "") + '>щомісяця</option>' +
+            '<div class="field"><label>' + t("Повторення") + '</label><select id="f-recur-freq">' +
+              '<option value="">' + t("не повторюється") + '</option>' +
+              '<option value="weekly"' + (j.recurrence && j.recurrence.freq === "weekly" ? " selected" : "") + '>' + t("щотижня") + '</option>' +
+              '<option value="biweekly"' + (j.recurrence && j.recurrence.freq === "biweekly" ? " selected" : "") + '>' + t("що 2 тижні") + '</option>' +
+              '<option value="monthly"' + (j.recurrence && j.recurrence.freq === "monthly" ? " selected" : "") + '>' + t("щомісяця") + '</option>' +
             '</select></div>' +
           '</div>' +
           '<div class="field" id="f-recur-until-wrap" style="' + (j.recurrence ? '' : 'display:none;') + '">' +
-            '<label>Повторювати до (необов\'язково)</label>' +
+            '<label>' + t("Повторювати до (необов'язково)") + '</label>' +
             '<input type="date" id="f-recur-until" value="' + ((j.recurrence && j.recurrence.until) || "") + '">' +
-            '<p class="auth-sub" style="margin-top:6px;">Наступні дати з\'являться автоматично (наперед приблизно на 2 місяці). Про кожну згенеровану дату Telegram-сповіщення не надсилається — тільки про перше створене завдання.</p>' +
+            '<p class="auth-sub" style="margin-top:6px;">' + t("Наступні дати з'являться автоматично (наперед приблизно на 2 місяці). Про кожну згенеровану дату Telegram-сповіщення не надсилається — тільки про перше створене завдання.") + '</p>' +
           '</div>' +
-          '<div class="field"><label>Нотатки</label><textarea id="f-notes">' + escapeHtml(j.notes) + '</textarea></div>' +
+          '<div class="field"><label>' + t("Нотатки") + '</label><textarea id="f-notes">' + escapeHtml(j.notes) + '</textarea></div>' +
         '</div>' +
-        '<div class="modal-foot">' + (id ? '<button class="btn btn-danger-text" id="ov-delete">Видалити</button>' : '<span></span>') +
-          '<button class="btn btn-primary" id="ov-save">Зберегти</button></div></div></div>';
+        '<div class="modal-foot">' + (id ? '<button class="btn btn-danger-text" id="ov-delete">' + t("Видалити") + '</button>' : '<span></span>') +
+          '<button class="btn btn-primary" id="ov-save">' + t("Зберегти") + '</button></div></div></div>';
 
     document.getElementById("ov-close").addEventListener("click", closeOverlay);
     document.getElementById("ov-backdrop").addEventListener("click", function (e) { if (e.target.id === "ov-backdrop") closeOverlay(); });
@@ -1395,12 +1629,12 @@
       var recurFreq = document.getElementById("f-recur-freq").value;
       data.recurrence = recurFreq ? { freq: recurFreq, until: document.getElementById("f-recur-until").value || null } : null;
       var req = id ? api("PATCH", "/api/jobs/" + id, data) : api("POST", "/api/jobs", data);
-      req.then(function () { toast(id ? "Завдання оновлено" : "Завдання заплановано"); closeOverlay(); loadAll(); })
+      req.then(function () { toast(id ? t("Завдання оновлено") : t("Завдання заплановано")); closeOverlay(); loadAll(); })
          .catch(function (err) { toast(err.message, true); });
     });
     if (id) {
       document.getElementById("ov-delete").addEventListener("click", function () {
-        if (!confirm("Видалити це завдання?")) return;
+        if (!confirm(t("Видалити це завдання?"))) return;
         api("DELETE", "/api/jobs/" + id).then(function () { toast("Завдання видалено"); closeOverlay(); loadAll(); });
       });
     }
@@ -1424,21 +1658,21 @@
     var root = document.getElementById("modal-root");
     root.innerHTML =
       '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
-        '<div class="modal-head"><h3>' + (id ? "Редагувати рахунок" : "Новий рахунок") + '</h3>' +
+        '<div class="modal-head"><h3>' + (id ? t("Редагувати рахунок") : t("Новий рахунок")) + '</h3>' +
           '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
         '<div class="modal-body">' +
-          '<div class="field"><label>Клієнт *</label><select id="f-client">' + clientOptionsHtml(i.clientId) + '</select></div>' +
+          '<div class="field"><label>' + t("Клієнт *") + '</label><select id="f-client">' + clientOptionsHtml(i.clientId) + '</select></div>' +
           '<div class="field-row">' +
-            '<div class="field"><label>Сума, € *</label><input type="number" id="f-amount" value="' + escapeHtml(i.amount) + '" min="0" step="1"></div>' +
-            '<div class="field"><label>Статус</label><select id="f-status">' +
-              ["unpaid", "paid"].map(function (s) { return '<option value="' + s + '"' + (i.status === s ? " selected" : "") + '>' + (s === "unpaid" ? "неоплачено" : "оплачено") + '</option>'; }).join("") + '</select></div></div>' +
+            '<div class="field"><label>' + t("Сума, € *") + '</label><input type="number" id="f-amount" value="' + escapeHtml(i.amount) + '" min="0" step="1"></div>' +
+            '<div class="field"><label>' + t("Статус") + '</label><select id="f-status">' +
+              ["unpaid", "paid"].map(function (s) { return '<option value="' + s + '"' + (i.status === s ? " selected" : "") + '>' + (s === "unpaid" ? t("неоплачено") : t("оплачено")) + '</option>'; }).join("") + '</select></div></div>' +
           '<div class="field-row">' +
-            '<div class="field"><label>Дата виставлення</label><input type="date" id="f-issue" value="' + i.issueDate + '"></div>' +
-            '<div class="field"><label>Термін оплати</label><input type="date" id="f-due" value="' + i.dueDate + '"></div></div>' +
-          '<div class="field"><label>Опис</label><input type="text" id="f-note" value="' + escapeHtml(i.note) + '" placeholder="Напр. Генеральне прибирання, вул. ..."></div>' +
+            '<div class="field"><label>' + t("Дата виставлення") + '</label><input type="date" id="f-issue" value="' + i.issueDate + '"></div>' +
+            '<div class="field"><label>' + t("Термін оплати") + '</label><input type="date" id="f-due" value="' + i.dueDate + '"></div></div>' +
+          '<div class="field"><label>' + t("Опис") + '</label><input type="text" id="f-note" value="' + escapeHtml(i.note) + '" placeholder="' + t("Напр. Генеральне прибирання, вул. ...") + '"></div>' +
         '</div>' +
-        '<div class="modal-foot">' + (id ? '<button class="btn btn-danger-text" id="ov-delete">Видалити</button>' : '<span></span>') +
-          '<button class="btn btn-primary" id="ov-save">Зберегти</button></div></div></div>';
+        '<div class="modal-foot">' + (id ? '<button class="btn btn-danger-text" id="ov-delete">' + t("Видалити") + '</button>' : '<span></span>') +
+          '<button class="btn btn-primary" id="ov-save">' + t("Зберегти") + '</button></div></div></div>';
 
     document.getElementById("ov-close").addEventListener("click", closeOverlay);
     document.getElementById("ov-backdrop").addEventListener("click", function (e) { if (e.target.id === "ov-backdrop") closeOverlay(); });
@@ -1454,12 +1688,12 @@
         note: document.getElementById("f-note").value.trim()
       };
       var req = id ? api("PATCH", "/api/invoices/" + id, data) : api("POST", "/api/invoices", data);
-      req.then(function () { toast(id ? "Рахунок оновлено" : "Рахунок створено"); closeOverlay(); loadAll(); })
+      req.then(function () { toast(id ? t("Рахунок оновлено") : t("Рахунок створено")); closeOverlay(); loadAll(); })
          .catch(function (err) { toast(err.message, true); });
     });
     if (id) {
       document.getElementById("ov-delete").addEventListener("click", function () {
-        if (!confirm("Видалити цей рахунок?")) return;
+        if (!confirm(t("Видалити цей рахунок?"))) return;
         api("DELETE", "/api/invoices/" + id).then(function () { toast("Рахунок видалено"); closeOverlay(); loadAll(); });
       });
     }
@@ -1475,7 +1709,7 @@
     document.querySelector("#view-inventory .table-wrap").style.display = list.length ? "" : "none";
 
     tbody.innerHTML = list.map(function (it) {
-      var stockPill = '<span class="pill ' + (it.low ? "overdue" : "active") + '"><span class="pill-dot"></span>' + Number(it.quantity) + " " + escapeHtml(it.unit) + '</span>';
+      var stockPill = '<span class="pill ' + (it.low ? "overdue" : "active") + '"><span class="pill-dot"></span>' + Number(it.quantity) + " " + escapeHtml(t(it.unit)) + '</span>';
       var thumb = it.photo
         ? '<img src="' + it.photo + '" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex-shrink:0;">'
         : '<div style="width:34px;height:34px;border-radius:8px;background:var(--surface-3);flex-shrink:0;"></div>';
@@ -1484,11 +1718,11 @@
           '<div><div class="cell-title" style="margin:0;">' + escapeHtml(it.name) + '</div>' +
           (it.code ? '<div class="cell-sub">№ ' + escapeHtml(it.code) + '</div>' : '') + '</div></div></td>' +
         '<td>' + stockPill + '</td>' +
-        '<td class="cell-sub">' + Number(it.minQuantity || 0) + ' ' + escapeHtml(it.unit) + '</td>' +
+        '<td class="cell-sub">' + Number(it.minQuantity || 0) + ' ' + escapeHtml(t(it.unit)) + '</td>' +
         '<td><div class="row-actions">' +
-          '<button class="btn btn-sm" data-log-usage="' + it.id + '">Списати</button>' +
-          '<button class="btn btn-sm btn-ghost" data-log-restock="' + it.id + '">Поповнити</button>' +
-          '<button class="icon-btn" data-edit-item="' + it.id + '" title="Редагувати"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
+          '<button class="btn btn-sm" data-log-usage="' + it.id + '">' + t("Списати") + '</button>' +
+          '<button class="btn btn-sm btn-ghost" data-log-restock="' + it.id + '">' + t("Поповнити") + '</button>' +
+          '<button class="icon-btn" data-edit-item="' + it.id + '" title="' + t("Редагувати") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
         '</div></td></tr>';
     }).join("");
 
@@ -1540,31 +1774,31 @@
   }
 
   function openInventoryItemModal(id) {
-    var it = id ? state.inventory.get(id) : { name: "", unit: "л", quantity: 0, minQuantity: 0, code: "", photo: null };
+    var it = id ? state.inventory.get(id) : { name: "", unit: t("л"), quantity: 0, minQuantity: 0, code: "", photo: null };
     var photoValue = it.photo || null;
     var root = document.getElementById("modal-root");
     root.innerHTML =
       '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
-        '<div class="modal-head"><h3>' + (id ? "Редагувати товар" : "Новий товар") + '</h3>' +
+        '<div class="modal-head"><h3>' + (id ? t("Редагувати товар") : t("Новий товар")) + '</h3>' +
           '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
         '<div class="modal-body">' +
-          '<div class="field"><label>Назва *</label><input type="text" id="f-name" value="' + escapeHtml(it.name) + '" placeholder="Напр. Засіб для скла"></div>' +
+          '<div class="field"><label>' + t("Назва *") + '</label><input type="text" id="f-name" value="' + escapeHtml(it.name) + '" placeholder="' + t("Напр. Засіб для скла") + '"></div>' +
           '<div class="field-row">' +
-            '<div class="field"><label>Одиниця виміру</label><select id="f-unit">' +
-              UNITS.map(function (u) { return '<option value="' + u + '"' + (it.unit === u ? " selected" : "") + '>' + u + '</option>'; }).join("") +
+            '<div class="field"><label>' + t("Одиниця виміру") + '</label><select id="f-unit">' +
+              UNITS.map(function (u) { return '<option value="' + u + '"' + (it.unit === u ? " selected" : "") + '>' + escapeHtml(t(u)) + '</option>'; }).join("") +
             '</select></div>' +
-            (id ? '' : '<div class="field"><label>Початковий залишок</label><input type="number" id="f-qty" value="' + it.quantity + '" min="0" step="0.1"></div>') +
+            (id ? '' : '<div class="field"><label>' + t("Початковий залишок") + '</label><input type="number" id="f-qty" value="' + it.quantity + '" min="0" step="0.1"></div>') +
           '</div>' +
-          '<div class="field"><label>Мінімальний залишок (поріг попередження)</label><input type="number" id="f-min" value="' + (it.minQuantity || 0) + '" min="0" step="0.1"></div>' +
-          '<div class="field"><label>Інвентарний номер</label><input type="text" id="f-code" value="' + escapeHtml(it.code || "") + '" placeholder="Напр. INV-001"></div>' +
-          '<div class="field"><label>Фото товару</label>' +
+          '<div class="field"><label>' + t("Мінімальний залишок (поріг попередження)") + '</label><input type="number" id="f-min" value="' + (it.minQuantity || 0) + '" min="0" step="0.1"></div>' +
+          '<div class="field"><label>' + t("Інвентарний номер") + '</label><input type="text" id="f-code" value="' + escapeHtml(it.code || "") + '" placeholder="' + t("Напр. INV-001") + '"></div>' +
+          '<div class="field"><label>' + t("Фото товару") + '</label>' +
             '<div id="photo-preview-wrap" style="margin-bottom:8px;">' + photoPreviewHtml(photoValue) + '</div>' +
             '<input type="file" id="f-photo" accept="image/*">' +
-            '<button type="button" class="btn btn-sm btn-ghost" id="photo-remove" style="margin-top:6px;' + (photoValue ? '' : 'display:none;') + '">Видалити фото</button>' +
+            '<button type="button" class="btn btn-sm btn-ghost" id="photo-remove" style="margin-top:6px;' + (photoValue ? '' : 'display:none;') + '">' + t("Видалити фото") + '</button>' +
           '</div>' +
         '</div>' +
-        '<div class="modal-foot">' + (id ? '<button class="btn btn-danger-text" id="ov-delete">Видалити</button>' : '<span></span>') +
-          '<button class="btn btn-primary" id="ov-save">Зберегти</button></div></div></div>';
+        '<div class="modal-foot">' + (id ? '<button class="btn btn-danger-text" id="ov-delete">' + t("Видалити") + '</button>' : '<span></span>') +
+          '<button class="btn btn-primary" id="ov-save">' + t("Зберегти") + '</button></div></div></div>';
 
     document.getElementById("ov-close").addEventListener("click", closeOverlay);
     document.getElementById("ov-backdrop").addEventListener("click", function (e) { if (e.target.id === "ov-backdrop") closeOverlay(); });
@@ -1597,12 +1831,12 @@
       };
       if (!id) data.quantity = document.getElementById("f-qty").value ? Number(document.getElementById("f-qty").value) : 0;
       var req = id ? api("PATCH", "/api/inventory/" + id, data) : api("POST", "/api/inventory", data);
-      req.then(function () { toast(id ? "Товар оновлено" : "Товар додано"); closeOverlay(); loadAll(); })
+      req.then(function () { toast(id ? t("Товар оновлено") : t("Товар додано")); closeOverlay(); loadAll(); })
          .catch(function (err) { toast(err.message, true); });
     });
     if (id) {
       document.getElementById("ov-delete").addEventListener("click", function () {
-        if (!confirm("Видалити товар \"" + it.name + "\" зі складу? Історію списань буде збережено.")) return;
+        if (!confirm(t("Видалити товар \"") + it.name + t("\" зі складу? Історію списань буде збережено."))) return;
         api("DELETE", "/api/inventory/" + id).then(function () { toast("Товар видалено"); closeOverlay(); loadAll(); });
       });
     }
@@ -1611,8 +1845,8 @@
   /* ============ modal: log usage / restock ============ */
   function inventoryJobOptionsHtml() {
     var jobs = jobsSorted().slice().reverse();
-    return '<option value="">— не пов\'язано із завданням —</option>' + jobs.map(function (j) {
-      return '<option value="' + j.id + '">' + fmtDateHuman(j.date) + " · " + escapeHtml(clientName(j.clientId)) + (j.service ? " · " + escapeHtml(j.service) : "") + '</option>';
+    return '<option value="">' + t("— не пов'язано із завданням —") + '</option>' + jobs.map(function (j) {
+      return '<option value="' + j.id + '">' + fmtDateHuman(j.date) + " · " + escapeHtml(clientName(j.clientId)) + (j.service ? " · " + escapeHtml(t(j.service)) : "") + '</option>';
     }).join("");
   }
 
@@ -1623,15 +1857,15 @@
     var root = document.getElementById("modal-root");
     root.innerHTML =
       '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
-        '<div class="modal-head"><h3>' + (isUsage ? "Списати: " : "Поповнити: ") + escapeHtml(it.name) + '</h3>' +
+        '<div class="modal-head"><h3>' + (isUsage ? t("Списати: ") : t("Поповнити: ")) + escapeHtml(it.name) + '</h3>' +
           '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
         '<div class="modal-body">' +
-          '<p class="auth-sub">Поточний залишок: ' + Number(it.quantity) + " " + escapeHtml(it.unit) + '</p>' +
-          '<div class="field"><label>Кількість (' + escapeHtml(it.unit) + ') *</label><input type="number" id="f-qty" min="0.01" step="0.1" autofocus></div>' +
-          (isUsage ? '<div class="field"><label>Завдання</label><select id="f-job">' + inventoryJobOptionsHtml() + '</select></div>' : '') +
-          '<div class="field"><label>Нотатка</label><input type="text" id="f-note" placeholder="Напр. причина, партія..."></div>' +
+          '<p class="auth-sub">' + t("Поточний залишок: ") + Number(it.quantity) + " " + escapeHtml(t(it.unit)) + '</p>' +
+          '<div class="field"><label>' + t("Кількість (") + escapeHtml(t(it.unit)) + ') *</label><input type="number" id="f-qty" min="0.01" step="0.1" autofocus></div>' +
+          (isUsage ? '<div class="field"><label>' + t("Завдання") + '</label><select id="f-job">' + inventoryJobOptionsHtml() + '</select></div>' : '') +
+          '<div class="field"><label>' + t("Нотатка") + '</label><input type="text" id="f-note" placeholder="' + t("Напр. причина, партія...") + '"></div>' +
         '</div>' +
-        '<div class="modal-foot"><span></span><button class="btn btn-primary" id="ov-save">' + (isUsage ? "Списати" : "Додати на склад") + '</button></div></div></div>';
+        '<div class="modal-foot"><span></span><button class="btn btn-primary" id="ov-save">' + (isUsage ? t("Списати") : t("Додати на склад")) + '</button></div></div></div>';
 
     document.getElementById("ov-close").addEventListener("click", closeOverlay);
     document.getElementById("ov-backdrop").addEventListener("click", function (e) { if (e.target.id === "ov-backdrop") closeOverlay(); });
@@ -1648,7 +1882,7 @@
         if (jobId) data.jobId = jobId;
       }
       api("POST", "/api/inventory/" + itemId + "/log", data).then(function () {
-        toast(isUsage ? "Списано зі складу" : "Склад поповнено");
+        toast(isUsage ? t("Списано зі складу") : t("Склад поповнено"));
         closeOverlay(); loadAll();
       }).catch(function (err) { toast(err.message, true); });
     });
@@ -1661,16 +1895,16 @@
     var root = document.getElementById("drawer-root");
     root.innerHTML =
       '<div class="drawer-backdrop" id="dr-backdrop"></div><div class="drawer">' +
-        '<div class="drawer-head"><div><h3>' + escapeHtml(it.name) + '</h3><span class="pill ' + (it.low ? "overdue" : "active") + '" style="margin-top:6px;"><span class="pill-dot"></span>' + Number(it.quantity) + ' ' + escapeHtml(it.unit) + '</span></div>' +
+        '<div class="drawer-head"><div><h3>' + escapeHtml(it.name) + '</h3><span class="pill ' + (it.low ? "overdue" : "active") + '" style="margin-top:6px;"><span class="pill-dot"></span>' + Number(it.quantity) + ' ' + escapeHtml(t(it.unit)) + '</span></div>' +
           '<button class="icon-btn" id="dr-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
         '<div class="drawer-body">' +
-          '<div class="drawer-section"><h4>Інформація</h4>' +
+          '<div class="drawer-section"><h4>' + t("Інформація") + '</h4>' +
             (it.photo ? '<img src="' + it.photo + '" alt="" style="width:100%;max-width:220px;border-radius:12px;object-fit:cover;display:block;margin-bottom:12px;">' : '') +
             '<div class="kv">' +
-            (it.code ? '<div class="kv-row"><div class="k">Інв. номер</div><div class="v">' + escapeHtml(it.code) + '</div></div>' : '') +
-            '<div class="kv-row"><div class="k">Залишок</div><div class="v">' + Number(it.quantity) + ' ' + escapeHtml(it.unit) + '</div></div>' +
-            '<div class="kv-row"><div class="k">Мінімальний залишок</div><div class="v">' + Number(it.minQuantity || 0) + ' ' + escapeHtml(it.unit) + '</div></div></div></div>' +
-          '<div class="drawer-section"><h4>Історія</h4><div id="inv-log-list"><div class="empty-note">Завантаження...</div></div></div>' +
+            (it.code ? '<div class="kv-row"><div class="k">' + t("Інв. номер") + '</div><div class="v">' + escapeHtml(it.code) + '</div></div>' : '') +
+            '<div class="kv-row"><div class="k">' + t("Залишок") + '</div><div class="v">' + Number(it.quantity) + ' ' + escapeHtml(t(it.unit)) + '</div></div>' +
+            '<div class="kv-row"><div class="k">' + t("Мінімальний залишок") + '</div><div class="v">' + Number(it.minQuantity || 0) + ' ' + escapeHtml(t(it.unit)) + '</div></div></div></div>' +
+          '<div class="drawer-section"><h4>' + t("Історія") + '</h4><div id="inv-log-list"><div class="empty-note">' + t("Завантаження...") + '</div></div></div>' +
         '</div></div>';
 
     function close() { root.innerHTML = ""; }
@@ -1680,9 +1914,9 @@
     api("GET", "/api/inventory/logs?itemId=" + id).then(function (logs) {
       var el = document.getElementById("inv-log-list");
       if (!el) return; // drawer already closed
-      if (!logs.length) { el.innerHTML = '<div class="empty-note">Ще немає записів.</div>'; return; }
+      if (!logs.length) { el.innerHTML = '<div class="empty-note">' + t("Ще немає записів.") + '</div>'; return; }
       el.innerHTML = logs.map(function (l) {
-        var typeLabel = l.type === "usage" ? "Списано" : l.type === "restock" ? "Поповнено" : "Коригування";
+        var typeLabel = l.type === "usage" ? t("Списано") : l.type === "restock" ? t("Поповнено") : t("Коригування");
         var sign = l.type === "usage" ? "−" : l.type === "restock" ? "+" : "";
         return '<div class="job-row"><div class="agenda-date">' + fmtDateHuman((l.createdAt || "").slice(0, 10)) + '</div>' +
           '<div class="agenda-main"><div class="title">' + typeLabel + ": " + sign + Number(l.quantity) + " " + escapeHtml(l.unit || "") + '</div>' +
@@ -1690,7 +1924,7 @@
       }).join("");
     }).catch(function () {
       var el = document.getElementById("inv-log-list");
-      if (el) el.innerHTML = '<div class="empty-note">Не вдалося завантажити історію.</div>';
+      if (el) el.innerHTML = '<div class="empty-note">' + t("Не вдалося завантажити історію.") + '</div>';
     });
   }
 
@@ -1699,15 +1933,15 @@
     var root = document.getElementById("modal-root");
     root.innerHTML =
       '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
-        '<div class="modal-head"><h3>Новий співробітник</h3>' +
+        '<div class="modal-head"><h3>' + t("Новий співробітник") + '</h3>' +
           '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
         '<div class="modal-body">' +
-          '<div class="field"><label>Ім\'я</label><input type="text" id="f-name" placeholder="Напр. Марія"></div>' +
-          '<div class="field"><label>Логін *</label><input type="text" id="f-username" placeholder="maria"></div>' +
-          '<div class="field"><label>Пароль *</label><input type="password" id="f-password" placeholder="Мінімум 8 символів"></div>' +
-          '<div class="field"><label>Роль</label><select id="f-role"><option value="employee">Співробітник</option><option value="admin">Адміністратор</option></select></div>' +
+          '<div class="field"><label>' + t("Ім'я") + '</label><input type="text" id="f-name" placeholder="' + t("Напр. Марія") + '"></div>' +
+          '<div class="field"><label>' + t("Логін *") + '</label><input type="text" id="f-username" placeholder="maria"></div>' +
+          '<div class="field"><label>' + t("Пароль *") + '</label><input type="password" id="f-password" placeholder="' + t("Мінімум 8 символів") + '"></div>' +
+          '<div class="field"><label>' + t("Роль") + '</label><select id="f-role"><option value="employee">' + t("Співробітник") + '</option><option value="admin">' + t("Адміністратор") + '</option></select></div>' +
         '</div>' +
-        '<div class="modal-foot"><span></span><button class="btn btn-primary" id="ov-save">Створити</button></div></div></div>';
+        '<div class="modal-foot"><span></span><button class="btn btn-primary" id="ov-save">' + t("Створити") + '</button></div></div></div>';
 
     document.getElementById("ov-close").addEventListener("click", closeOverlay);
     document.getElementById("ov-backdrop").addEventListener("click", function (e) { if (e.target.id === "ov-backdrop") closeOverlay(); });
@@ -1797,6 +2031,10 @@
       state.invoiceFilter = chip.getAttribute("data-inv-status");
       renderInvoices();
     });
+  });
+
+  document.querySelectorAll(".lang-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () { setLang(btn.getAttribute("data-lang")); });
   });
 
   boot();

@@ -102,6 +102,14 @@ nav.primary-nav { display: flex; flex-direction: column; gap: 2px; }
 .nav-item .count { margin-left: auto; font-size: 11px; font-family: "IBM Plex Mono", monospace; color: var(--text-faint); }
 
 .sidebar-footer { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); }
+.lang-switch { display: flex; gap: 6px; margin-bottom: 8px; }
+.lang-btn {
+  flex: 1; padding: 6px 0; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text-muted); font-size: 11.5px; font-weight: 700; letter-spacing: 0.03em; cursor: pointer;
+  font-family: "IBM Plex Mono", monospace;
+}
+.lang-btn:hover { background: var(--surface-3); color: var(--text); }
+.lang-btn.active { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent-soft); }
 .tg-badge {
   display: flex; align-items: center; gap: 7px; width: 100%; margin-bottom: 8px;
   padding: 7px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2);
@@ -169,18 +177,19 @@ main.content { flex: 1; min-width: 0; padding: 26px 34px 60px; max-width: 1280px
 .stat-tile.accent .value { color: var(--accent-strong); }
 
 .dash-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); gap: 16px; align-items: start; }
-.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+.dash-grid > div { min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; min-width: 0; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .panel-head h3 { font-size: 14.5px; }
 
 .cal-nav { display: flex; align-items: center; gap: 6px; }
 .cal-month-label { font-family: "Sora", sans-serif; font-weight: 700; font-size: 15px; min-width: 148px; text-align: center; }
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; min-width: 0; }
 .cal-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; padding-bottom: 4px; }
 .cal-cell {
   position: relative; aspect-ratio: 1 / 0.82; border-radius: 9px; border: 1px solid var(--border);
   background: var(--surface); padding: 6px 7px; cursor: pointer; display: flex; flex-direction: column;
-  gap: 4px; overflow: hidden; transition: border-color .15s ease, transform .1s ease;
+  gap: 4px; overflow: hidden; transition: border-color .15s ease, transform .1s ease; min-width: 0;
 }
 .cal-cell:hover { border-color: var(--accent); transform: translateY(-1px); }
 .cal-cell.muted { opacity: .38; }
@@ -434,9 +443,12 @@ button.widget-status:hover { border-color: var(--accent); color: var(--accent-st
   .dash-grid { grid-template-columns: 1fr; }
   .panel { padding: 14px; }
 
-  .cal-cell { padding: 4px 5px; }
-  .cal-daynum { font-size: 11px; }
+  .cal-grid { gap: 3px; }
+  .cal-cell { padding: 3px 4px; }
+  .cal-daynum { font-size: 10px; }
   .cal-more { display: none; }
+  .cal-dow { font-size: 9.5px; letter-spacing: 0; }
+  .cal-month-label { min-width: 0; font-size: 13px; }
 
   .toolbar { gap: 8px; }
   .search-input { min-width: 0; max-width: none; flex-basis: 100%; }

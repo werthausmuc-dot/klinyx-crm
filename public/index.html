@@ -21,16 +21,16 @@
   <div class="auth-card">
     <div class="auth-brand">
       <img src="/logo.png" alt="Kliny X" class="auth-logo">
-      <span class="auth-brand-tag">Перший запуск</span>
+      <span class="auth-brand-tag" data-i18n="Перший запуск">Перший запуск</span>
     </div>
-    <h1>Створіть обліковий запис адміністратора</h1>
-    <p class="auth-sub">Це буде перший акаунт у системі — з нього ви зможете додавати облікові записи для співробітників.</p>
+    <h1 data-i18n="Створіть обліковий запис адміністратора">Створіть обліковий запис адміністратора</h1>
+    <p class="auth-sub" data-i18n="Це буде перший акаунт у системі — з нього ви зможете додавати облікові записи для співробітників.">Це буде перший акаунт у системі — з нього ви зможете додавати облікові записи для співробітників.</p>
     <form id="setup-form" class="auth-form">
-      <div class="field"><label>Ваше ім'я</label><input type="text" id="su-name" placeholder="Напр. Олег" required></div>
-      <div class="field"><label>Логін</label><input type="text" id="su-username" placeholder="admin" required autocomplete="username"></div>
-      <div class="field"><label>Пароль</label><input type="password" id="su-password" placeholder="Мінімум 8 символів" required minlength="8" autocomplete="new-password"></div>
+      <div class="field"><label data-i18n="Ваше ім'я">Ваше ім'я</label><input type="text" id="su-name" placeholder="Напр. Олег" data-i18n-placeholder="Напр. Олег" required></div>
+      <div class="field"><label data-i18n="Логін">Логін</label><input type="text" id="su-username" placeholder="admin" required autocomplete="username"></div>
+      <div class="field"><label data-i18n="Пароль">Пароль</label><input type="password" id="su-password" placeholder="Мінімум 8 символів" data-i18n-placeholder="Мінімум 8 символів" required minlength="8" autocomplete="new-password"></div>
       <div class="auth-error" id="setup-error" hidden></div>
-      <button type="submit" class="btn btn-primary btn-block">Створити й увійти</button>
+      <button type="submit" class="btn btn-primary btn-block" data-i18n="Створити й увійти">Створити й увійти</button>
     </form>
   </div>
 </div>
@@ -39,15 +39,15 @@
   <div class="auth-card">
     <div class="auth-brand">
       <img src="/logo.png" alt="Kliny X" class="auth-logo">
-      <span class="auth-brand-tag">Вхід у систему</span>
+      <span class="auth-brand-tag" data-i18n="Вхід у систему">Вхід у систему</span>
     </div>
-    <h1>Вхід</h1>
-    <p class="auth-sub">Увійдіть під своїм робочим логіном.</p>
+    <h1 data-i18n="Вхід">Вхід</h1>
+    <p class="auth-sub" data-i18n="Увійдіть під своїм робочим логіном.">Увійдіть під своїм робочим логіном.</p>
     <form id="login-form" class="auth-form">
-      <div class="field"><label>Логін</label><input type="text" id="li-username" required autocomplete="username" autofocus></div>
-      <div class="field"><label>Пароль</label><input type="password" id="li-password" required autocomplete="current-password"></div>
+      <div class="field"><label data-i18n="Логін">Логін</label><input type="text" id="li-username" required autocomplete="username" autofocus></div>
+      <div class="field"><label data-i18n="Пароль">Пароль</label><input type="password" id="li-password" required autocomplete="current-password"></div>
       <div class="auth-error" id="login-error" hidden></div>
-      <button type="submit" class="btn btn-primary btn-block">Увійти</button>
+      <button type="submit" class="btn btn-primary btn-block" data-i18n="Увійти">Увійти</button>
     </form>
   </div>
 </div>
@@ -55,7 +55,7 @@
 <!-- ============ main app ============ -->
 <div id="app" hidden>
   <header class="mobile-topbar">
-    <button class="icon-btn" id="btn-menu-open" aria-label="Меню">
+    <button class="icon-btn" id="btn-menu-open" aria-label="Меню" data-i18n-aria-label="Меню">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
     </button>
     <img src="/logo.png" alt="Kliny X" class="mobile-topbar-logo">
@@ -65,45 +65,49 @@
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <img src="/logo.png" alt="Kliny X" class="brand-logo">
-      <span class="brand-tag">CRM &amp; календар</span>
-      <button class="icon-btn sidebar-close" id="btn-menu-close" aria-label="Закрити меню">
+      <span class="brand-tag" data-i18n="CRM & календар">CRM &amp; календар</span>
+      <button class="icon-btn sidebar-close" id="btn-menu-close" aria-label="Закрити меню" data-i18n-aria-label="Закрити меню">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
     <nav class="primary-nav">
       <button class="nav-item" data-view="dashboard">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
-        Дашборд
+        <span data-i18n="Дашборд">Дашборд</span>
       </button>
       <button class="nav-item" data-view="clients">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6.2 6.5-6.2s6.5 2.6 6.5 6.2"/><circle cx="17.5" cy="8.5" r="2.4"/><path d="M15.8 13.8c2.9.3 5.2 2.6 5.2 5.9"/></svg>
-        Клієнти
+        <span data-i18n="Клієнти">Клієнти</span>
         <span class="count" id="nav-count-clients"></span>
       </button>
       <button class="nav-item" data-view="invoices">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2.5h9l3.5 3.5V21.5H6z"/><path d="M9.5 9h5M9.5 12.5h5M9.5 16h3"/></svg>
-        Рахунки
+        <span data-i18n="Рахунки">Рахунки</span>
         <span class="count" id="nav-count-invoices"></span>
       </button>
       <button class="nav-item" data-view="inventory" id="nav-inventory" hidden>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8L12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
-        Склад
+        <span data-i18n="Склад">Склад</span>
         <span class="count" id="nav-count-inventory"></span>
       </button>
       <button class="nav-item" data-view="team" id="nav-team" hidden>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Команда
+        <span data-i18n="Команда">Команда</span>
       </button>
       <button class="nav-item" data-view="roadmap">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 21V4"/><path d="M5 4h13l-2.6 4.2L18 12.5H5"/></svg>
-        План розвитку
+        <span data-i18n="План розвитку">План розвитку</span>
       </button>
       <button class="nav-item" data-view="orders">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-        Замовлення
+        <span data-i18n="Замовлення">Замовлення</span>
       </button>
     </nav>
     <div class="sidebar-footer">
+      <div class="lang-switch">
+        <button type="button" class="lang-btn" data-lang="uk">UA</button>
+        <button type="button" class="lang-btn" data-lang="de">DE</button>
+      </div>
       <button class="tg-badge" id="btn-telegram" type="button">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.3 18.8 19.7c-.2 1-.9 1.3-1.7.8l-4.7-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.3-4.9 8.9-8c.4-.3-.1-.5-.6-.2L6.6 13.2l-4.7-1.5c-1-.3-1-1 .2-1.5L20.6 3.1c.8-.3 1.6.2 1.3 1.2z"/></svg>
         <span id="tg-badge-text">Telegram: —</span>
@@ -114,7 +118,7 @@
           <strong id="me-name">—</strong>
           <span id="me-role">—</span>
         </div>
-        <button class="icon-btn" id="btn-logout" title="Вийти">
+        <button class="icon-btn" id="btn-logout" title="Вийти" data-i18n-title="Вийти">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
         </button>
       </div>
@@ -127,34 +131,34 @@
     <section class="view" id="view-dashboard">
       <div class="page-header">
         <div>
-          <h1>Дашборд</h1>
+          <h1 data-i18n="Дашборд">Дашборд</h1>
           <p class="sub" id="today-label">—</p>
         </div>
         <div class="header-actions">
           <button class="btn" id="btn-new-client-dash">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            Клієнт
+            <span data-i18n="Клієнт">Клієнт</span>
           </button>
           <button class="btn btn-primary" id="btn-new-job-dash">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            Нове завдання
+            <span data-i18n="Нове завдання">Нове завдання</span>
           </button>
         </div>
       </div>
 
       <div class="stat-grid">
-        <div class="stat-tile"><div class="label">Клієнтів усього</div><div class="value" id="stat-clients">0</div></div>
-        <div class="stat-tile accent"><div class="label">Завдань цього тижня</div><div class="value" id="stat-week-jobs">0</div></div>
-        <div class="stat-tile"><div class="label">Сьогодні заплановано</div><div class="value" id="stat-today">0</div></div>
-        <div class="stat-tile warn"><div class="label">Неоплачено</div><div class="value" id="stat-unpaid">€0</div></div>
-        <div class="stat-tile accent"><div class="label">Орієнтовний заробіток за місяць</div><div class="value" id="stat-month-income">€0</div></div>
+        <div class="stat-tile"><div class="label" data-i18n="Клієнтів усього">Клієнтів усього</div><div class="value" id="stat-clients">0</div></div>
+        <div class="stat-tile accent"><div class="label" data-i18n="Завдань цього тижня">Завдань цього тижня</div><div class="value" id="stat-week-jobs">0</div></div>
+        <div class="stat-tile"><div class="label" data-i18n="Сьогодні заплановано">Сьогодні заплановано</div><div class="value" id="stat-today">0</div></div>
+        <div class="stat-tile warn"><div class="label" data-i18n="Неоплачено">Неоплачено</div><div class="value" id="stat-unpaid">€0</div></div>
+        <div class="stat-tile accent"><div class="label" data-i18n="Орієнтовний заробіток за місяць">Орієнтовний заробіток за місяць</div><div class="value" id="stat-month-income">€0</div></div>
       </div>
 
       <div class="dash-grid">
         <div style="display:flex; flex-direction:column; gap:16px;">
           <div class="panel">
             <div class="panel-head">
-              <h3>Календар завдань</h3>
+              <h3 data-i18n="Календар завдань">Календар завдань</h3>
               <div class="cal-nav">
                 <button class="icon-btn" id="cal-prev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
                 <div class="cal-month-label" id="cal-month-label">—</div>
@@ -166,29 +170,29 @@
           </div>
 
           <div class="panel" id="dayplan-panel" hidden>
-            <div class="panel-head"><h3 id="dayplan-title">План на день</h3></div>
+            <div class="panel-head"><h3 id="dayplan-title" data-i18n="План на день">План на день</h3></div>
             <div class="platform-tasks" id="dayplan-list"></div>
             <div class="platform-notes-add">
-              <input type="text" id="dayplan-new-input" placeholder="Напр. Подзвонити постачальнику...">
-              <button class="btn btn-sm" id="dayplan-add-btn" type="button">Додати</button>
+              <input type="text" id="dayplan-new-input" placeholder="Напр. Подзвонити постачальнику..." data-i18n-placeholder="Напр. Подзвонити постачальнику...">
+              <button class="btn btn-sm" id="dayplan-add-btn" type="button" data-i18n="Додати">Додати</button>
             </div>
           </div>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:16px;">
           <div class="panel">
-            <div class="panel-head"><h3 id="agenda-title">Найближчі завдання</h3></div>
+            <div class="panel-head"><h3 id="agenda-title" data-i18n="Найближчі завдання">Найближчі завдання</h3></div>
             <div id="agenda-list"></div>
           </div>
           <div class="panel">
-            <div class="panel-head"><h3>Потребують уваги</h3></div>
+            <div class="panel-head"><h3 data-i18n="Потребують уваги">Потребують уваги</h3></div>
             <div id="reminders-list"></div>
           </div>
           <div class="panel">
-            <div class="panel-head"><h3>Фінансові підсумки</h3></div>
+            <div class="panel-head"><h3 data-i18n="Фінансові підсумки">Фінансові підсумки</h3></div>
             <div class="kv" style="padding:2px 4px;">
-              <div class="kv-row"><div class="k">Цей тиждень</div><div class="v" id="fin-week">—</div></div>
-              <div class="kv-row"><div class="k">Цей місяць</div><div class="v" id="fin-month">—</div></div>
+              <div class="kv-row"><div class="k" data-i18n="Цей тиждень">Цей тиждень</div><div class="v" id="fin-week">—</div></div>
+              <div class="kv-row"><div class="k" data-i18n="Цей місяць">Цей місяць</div><div class="v" id="fin-month">—</div></div>
             </div>
           </div>
         </div>
@@ -198,102 +202,102 @@
     <!-- CLIENTS -->
     <section class="view" id="view-clients">
       <div class="page-header">
-        <div><h1>Клієнти</h1><p class="sub">Клієнтська база Kliny X</p></div>
+        <div><h1 data-i18n="Клієнти">Клієнти</h1><p class="sub" data-i18n="Клієнтська база Kliny X">Клієнтська база Kliny X</p></div>
         <div class="header-actions">
           <button class="btn btn-primary" id="btn-new-client">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            Додати клієнта
+            <span data-i18n="Додати клієнта">Додати клієнта</span>
           </button>
         </div>
       </div>
       <div class="toolbar">
         <div class="search-input">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-          <input type="text" id="client-search" placeholder="Пошук за ім'ям, телефоном, адресою...">
+          <input type="text" id="client-search" placeholder="Пошук за ім'ям, телефоном, адресою..." data-i18n-placeholder="Пошук за ім'ям, телефоном, адресою...">
         </div>
-        <button class="filter-chip active" data-status="all">Усі</button>
-        <button class="filter-chip" data-status="lead">Ліди</button>
-        <button class="filter-chip" data-status="active">Активні</button>
-        <button class="filter-chip" data-status="inactive">Неактивні</button>
+        <button class="filter-chip active" data-status="all" data-i18n="Усі">Усі</button>
+        <button class="filter-chip" data-status="lead" data-i18n="Ліди">Ліди</button>
+        <button class="filter-chip" data-status="active" data-i18n="Активні">Активні</button>
+        <button class="filter-chip" data-status="inactive" data-i18n="Неактивні">Неактивні</button>
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Клієнт</th><th>Контакти</th><th>Статус</th><th>Наступне завдання</th><th></th></tr></thead>
+          <thead><tr><th data-i18n="Клієнт">Клієнт</th><th data-i18n="Контакти">Контакти</th><th data-i18n="Статус">Статус</th><th data-i18n="Наступне завдання">Наступне завдання</th><th></th></tr></thead>
           <tbody id="clients-tbody"></tbody>
         </table>
       </div>
-      <div class="empty-note" id="clients-empty" hidden>Клієнтів ще немає. Додайте першого клієнта, щоб почати вести базу.</div>
+      <div class="empty-note" id="clients-empty" hidden data-i18n="Клієнтів ще немає. Додайте першого клієнта, щоб почати вести базу.">Клієнтів ще немає. Додайте першого клієнта, щоб почати вести базу.</div>
     </section>
 
     <!-- INVOICES -->
     <section class="view" id="view-invoices">
       <div class="page-header">
-        <div><h1>Рахунки</h1><p class="sub">Оплати та виставлені рахунки</p></div>
+        <div><h1 data-i18n="Рахунки">Рахунки</h1><p class="sub" data-i18n="Оплати та виставлені рахунки">Оплати та виставлені рахунки</p></div>
         <div class="header-actions">
           <button class="btn" id="btn-export-invoices">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
-            Експорт CSV
+            <span data-i18n="Експорт CSV">Експорт CSV</span>
           </button>
           <button class="btn btn-primary" id="btn-new-invoice">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            Виставити рахунок
+            <span data-i18n="Виставити рахунок">Виставити рахунок</span>
           </button>
         </div>
       </div>
       <div class="stat-grid" style="grid-template-columns:repeat(3,1fr); margin-bottom:16px;">
-        <div class="stat-tile"><div class="label">Виставлено всього</div><div class="value" id="inv-total">€0</div></div>
-        <div class="stat-tile warn"><div class="label">Неоплачено</div><div class="value" id="inv-unpaid">€0</div></div>
-        <div class="stat-tile accent"><div class="label">Оплачено</div><div class="value" id="inv-paid">€0</div></div>
+        <div class="stat-tile"><div class="label" data-i18n="Виставлено всього">Виставлено всього</div><div class="value" id="inv-total">€0</div></div>
+        <div class="stat-tile warn"><div class="label" data-i18n="Неоплачено">Неоплачено</div><div class="value" id="inv-unpaid">€0</div></div>
+        <div class="stat-tile accent"><div class="label" data-i18n="Оплачено">Оплачено</div><div class="value" id="inv-paid">€0</div></div>
       </div>
       <div class="toolbar">
-        <button class="filter-chip active" data-inv-status="all">Усі</button>
-        <button class="filter-chip" data-inv-status="unpaid">Неоплачені</button>
-        <button class="filter-chip" data-inv-status="overdue">Прострочені</button>
-        <button class="filter-chip" data-inv-status="paid">Оплачені</button>
+        <button class="filter-chip active" data-inv-status="all" data-i18n="Усі">Усі</button>
+        <button class="filter-chip" data-inv-status="unpaid" data-i18n="Неоплачені">Неоплачені</button>
+        <button class="filter-chip" data-inv-status="overdue" data-i18n="Прострочені">Прострочені</button>
+        <button class="filter-chip" data-inv-status="paid" data-i18n="Оплачені">Оплачені</button>
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Клієнт</th><th>Опис</th><th class="num">Сума</th><th>Термін оплати</th><th>Статус</th><th></th></tr></thead>
+          <thead><tr><th data-i18n="Клієнт">Клієнт</th><th data-i18n="Опис">Опис</th><th class="num" data-i18n="Сума">Сума</th><th data-i18n="Термін оплати">Термін оплати</th><th data-i18n="Статус">Статус</th><th></th></tr></thead>
           <tbody id="invoices-tbody"></tbody>
         </table>
       </div>
-      <div class="empty-note" id="invoices-empty" hidden>Рахунків ще немає.</div>
+      <div class="empty-note" id="invoices-empty" hidden data-i18n="Рахунків ще немає.">Рахунків ще немає.</div>
     </section>
 
     <!-- INVENTORY (admin only) -->
     <section class="view" id="view-inventory">
       <div class="page-header">
-        <div><h1>Склад</h1><p class="sub">Облік хімії та витратних матеріалів</p></div>
+        <div><h1 data-i18n="Склад">Склад</h1><p class="sub" data-i18n="Облік хімії та витратних матеріалів">Облік хімії та витратних матеріалів</p></div>
         <div class="header-actions">
           <button class="btn btn-primary" id="btn-new-inventory-item">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            Додати товар
+            <span data-i18n="Додати товар">Додати товар</span>
           </button>
         </div>
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Товар</th><th>Залишок</th><th>Мін. залишок</th><th></th></tr></thead>
+          <thead><tr><th data-i18n="Товар">Товар</th><th data-i18n="Залишок">Залишок</th><th data-i18n="Мін. залишок">Мін. залишок</th><th></th></tr></thead>
           <tbody id="inventory-tbody"></tbody>
         </table>
       </div>
-      <div class="empty-note" id="inventory-empty" hidden>Товарів ще немає. Додайте перший, щоб почати облік хімії.</div>
+      <div class="empty-note" id="inventory-empty" hidden data-i18n="Товарів ще немає. Додайте перший, щоб почати облік хімії.">Товарів ще немає. Додайте перший, щоб почати облік хімії.</div>
     </section>
 
     <!-- TEAM (admin only) -->
     <section class="view" id="view-team">
       <div class="page-header">
-        <div><h1>Команда</h1><p class="sub">Облікові записи співробітників для входу в систему</p></div>
+        <div><h1 data-i18n="Команда">Команда</h1><p class="sub" data-i18n="Облікові записи співробітників для входу в систему">Облікові записи співробітників для входу в систему</p></div>
         <div class="header-actions">
           <button class="btn btn-primary" id="btn-new-user">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            Додати співробітника
+            <span data-i18n="Додати співробітника">Додати співробітника</span>
           </button>
         </div>
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Ім'я</th><th>Логін</th><th>Роль</th><th>Статус</th><th>Telegram</th><th></th></tr></thead>
+          <thead><tr><th data-i18n="Ім'я">Ім'я</th><th data-i18n="Логін">Логін</th><th data-i18n="Роль">Роль</th><th data-i18n="Статус">Статус</th><th>Telegram</th><th></th></tr></thead>
           <tbody id="users-tbody"></tbody>
         </table>
       </div>
@@ -302,48 +306,48 @@
     <!-- ROADMAP -->
     <section class="view" id="view-roadmap">
       <div class="page-header">
-        <div><h1>План розвитку</h1><p class="sub">Що вже готово в Kliny X CRM і що далі</p></div>
+        <div><h1 data-i18n="План розвитку">План розвитку</h1><p class="sub" data-i18n="Що вже готово в Kliny X CRM і що далі">Що вже готово в Kliny X CRM і що далі</p></div>
         <div class="header-actions" id="roadmap-admin-actions" hidden>
           <button class="btn btn-primary" id="btn-new-roadmap">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            Додати пункт
+            <span data-i18n="Додати пункт">Додати пункт</span>
           </button>
         </div>
       </div>
       <div class="roadmap-board">
         <div class="roadmap-col" data-status="backlog">
-          <div class="roadmap-col-head"><span class="roadmap-dot backlog"></span>Заплановано<span class="count" id="roadmap-count-backlog"></span></div>
+          <div class="roadmap-col-head"><span class="roadmap-dot backlog"></span><span data-i18n="Заплановано">Заплановано</span><span class="count" id="roadmap-count-backlog"></span></div>
           <div class="roadmap-cards" id="roadmap-list-backlog"></div>
         </div>
         <div class="roadmap-col" data-status="in_progress">
-          <div class="roadmap-col-head"><span class="roadmap-dot in_progress"></span>В процесі<span class="count" id="roadmap-count-in_progress"></span></div>
+          <div class="roadmap-col-head"><span class="roadmap-dot in_progress"></span><span data-i18n="В процесі">В процесі</span><span class="count" id="roadmap-count-in_progress"></span></div>
           <div class="roadmap-cards" id="roadmap-list-in_progress"></div>
         </div>
         <div class="roadmap-col" data-status="done">
-          <div class="roadmap-col-head"><span class="roadmap-dot done"></span>Готово<span class="count" id="roadmap-count-done"></span></div>
+          <div class="roadmap-col-head"><span class="roadmap-dot done"></span><span data-i18n="Готово">Готово</span><span class="count" id="roadmap-count-done"></span></div>
           <div class="roadmap-cards" id="roadmap-list-done"></div>
         </div>
       </div>
-      <div class="empty-note" id="roadmap-empty" hidden>Плану розвитку ще немає.</div>
+      <div class="empty-note" id="roadmap-empty" hidden data-i18n="Плану розвитку ще немає.">Плану розвитку ще немає.</div>
     </section>
 
     <!-- ORDERS / PLATFORM WIDGETS -->
     <section class="view" id="view-orders">
       <div class="page-header">
-        <div><h1>Замовлення</h1><p class="sub">Швидкий перехід на платформи, де шукаємо замовлення</p></div>
+        <div><h1 data-i18n="Замовлення">Замовлення</h1><p class="sub" data-i18n="Швидкий перехід на платформи, де шукаємо замовлення">Швидкий перехід на платформи, де шукаємо замовлення</p></div>
         <div class="header-actions" id="orders-admin-actions" hidden>
           <button class="btn btn-primary" id="btn-new-order">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            Додати платформу
+            <span data-i18n="Додати платформу">Додати платформу</span>
           </button>
         </div>
       </div>
       <div class="toolbar" id="orders-tabs">
-        <button class="filter-chip active" type="button" data-orders-tab="manual">Додані вручну</button>
-        <button class="filter-chip" type="button" data-orders-tab="auto">Рекомендовані (авто)</button>
+        <button class="filter-chip active" type="button" data-orders-tab="manual" data-i18n="Додані вручну">Додані вручну</button>
+        <button class="filter-chip" type="button" data-orders-tab="auto" data-i18n="Рекомендовані (авто)">Рекомендовані (авто)</button>
       </div>
       <div class="widget-grid" id="orders-grid"></div>
-      <div class="empty-note" id="orders-empty" hidden>Платформ ще немає — додай першу кнопкою вище.</div>
+      <div class="empty-note" id="orders-empty" hidden data-i18n="Платформ ще немає — додай першу кнопкою вище.">Платформ ще немає — додай першу кнопкою вище.</div>
     </section>
 
   </main>
