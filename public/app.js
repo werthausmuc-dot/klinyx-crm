@@ -1012,8 +1012,15 @@
     var monthTotal = sumPrice(monthJobsF), monthPaid = sumPrice(monthJobsF.filter(function (j) { return j.paid; }));
     document.getElementById("fin-week").textContent = fmtMoney(weekTotal) + t(" (оплачено ") + fmtMoney(weekPaid) + ")";
     document.getElementById("fin-month").textContent = fmtMoney(monthTotal) + t(" (оплачено ") + fmtMoney(monthPaid) + ")";
+    // "Орієнтовний заробіток за місяць" tracks whichever calendar month the
+    // task-calendar widget is currently showing (state.calYear/calMonth),
+    // not always the real-world current month — so it updates when the
+    // person pages the calendar forward/back.
+    var calMr = monthRange(new Date(state.calYear, state.calMonth, 1));
+    var calMonthJobsF = jobs.filter(function (j) { return j.status !== "cancelled" && j.date >= calMr.start && j.date <= calMr.end; });
+    var calMonthTotal = sumPrice(calMonthJobsF);
     var statMonthIncome = document.getElementById("stat-month-income");
-    if (statMonthIncome) statMonthIncome.textContent = fmtMoney(monthTotal);
+    if (statMonthIncome) statMonthIncome.textContent = fmtMoney(calMonthTotal);
 
     renderCalendar();
     renderAgenda();
@@ -2406,11 +2413,11 @@
 
   document.getElementById("cal-prev").addEventListener("click", function () {
     state.calMonth--; if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; }
-    renderCalendar();
+    renderDashboard();
   });
   document.getElementById("cal-next").addEventListener("click", function () {
     state.calMonth++; if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
-    renderCalendar();
+    renderDashboard();
   });
 
   document.getElementById("client-search").addEventListener("input", function (e) { state.clientQuery = e.target.value; renderClients(); });
