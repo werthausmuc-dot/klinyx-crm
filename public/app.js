@@ -207,6 +207,7 @@
     "Виставлено всього": "Gesamt ausgestellt", "Оплачено": "Bezahlt",
     "Неоплачені": "Unbezahlt", "Прострочені": "Überfällig", "Оплачені": "Bezahlt",
     "Рахунків ще немає.": "Noch keine Rechnungen.",
+    "Без дати": "Ohne Datum",
     "Облік хімії та витратних матеріалів": "Verwaltung von Reinigungsmitteln und Verbrauchsmaterial",
     "Додати товар": "Artikel hinzufügen", "Товар": "Artikel", "Мін. залишок": "Mindestbestand",
     "Товарів ще немає. Додайте перший, щоб почати облік хімії.": "Noch keine Artikel. Fügen Sie den ersten hinzu, um die Lagerverwaltung zu starten.",
@@ -518,6 +519,7 @@
       "Прострочені": "متأخرة",
       "Оплачені": "مدفوعة",
       "Рахунків ще немає.": "لا توجد فواتير بعد.",
+      "Без дати": "بدون تاريخ",
       "Облік хімії та витратних матеріалів": "إدارة المواد الكيميائية والمستهلكات",
       "Додати товар": "إضافة صنف",
       "Товар": "الصنف",
@@ -1276,19 +1278,50 @@
     document.getElementById("invoices-empty").hidden = !!all.length;
     document.querySelector("#view-invoices .table-wrap").style.display = all.length ? "" : "none";
 
-    tbody.innerHTML = list.map(function (inv) {
-      var overdue = isOverdue(inv);
-      var statusClass = overdue ? "overdue" : inv.status;
-      return '<tr>' +
-        '<td class="cell-title">' + escapeHtml(clientName(inv.clientId)) + '</td>' +
-        '<td>' + escapeHtml(inv.note || "—") + '</td>' +
-        '<td class="num">' + fmtMoney(inv.amount) + '</td>' +
-        '<td>' + fmtDateHuman(inv.dueDate) + '</td>' +
-        '<td><span class="pill ' + statusClass + '"><span class="pill-dot"></span>' + statusLabelInvoice(inv) + '</span></td>' +
-        '<td><div class="row-actions">' +
-          (inv.status === "unpaid" ? '<button class="btn btn-sm" data-mark-paid="' + inv.id + '">' + t("Позначити оплаченим") + '</button>' : '<button class="btn btn-sm btn-ghost" data-mark-unpaid="' + inv.id + '">' + t("Скасувати оплату") + '</button>') +
-          '<button class="icon-btn" data-edit-invoice="' + inv.id + '" title="' + t("Редагувати") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
-          '<button class="icon-btn" data-del-invoice="' + inv.id + '" title="' + t("Видалити") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button></div></td></tr>';
+    // Group invoices by month (of their due date, falling back to the issue
+    // date for invoices without one) so long lists read as a per-month
+    // statement instead of one flat table.
+    var groups = [];
+    var groupByKey = Object.create(null);
+    list.forEach(function (inv) {
+      var d = inv.dueDate || inv.issueDate || "";
+      var key = d.slice(0, 7); // "YYYY-MM", or "" if no date at all
+      if (!Object.prototype.hasOwnProperty.call(groupByKey, key)) {
+        var g = { key: key, items: [] };
+        groupByKey[key] = g;
+        groups.push(g);
+      }
+      groupByKey[key].items.push(inv);
+    });
+    groups.sort(function (a, b) { return b.key.localeCompare(a.key); });
+    groups.forEach(function (g) {
+      g.items.sort(function (a, b) { return (a.dueDate || a.issueDate || "").localeCompare(b.dueDate || b.issueDate || ""); });
+    });
+    function monthGroupLabel(key) {
+      if (!key) return t("Без дати");
+      var parts = key.split("-");
+      var y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1;
+      var name = (MONTHS[state.lang] && MONTHS[state.lang][m]) || "";
+      return name + " " + y;
+    }
+    tbody.innerHTML = groups.map(function (g) {
+      var groupSum = g.items.reduce(function (s, i) { return s + (Number(i.amount) || 0); }, 0);
+      var header = '<tr class="invoice-month-row"><td colspan="6"><span class="invoice-month-label">' + escapeHtml(monthGroupLabel(g.key)) + '</span><span class="invoice-month-sum">' + fmtMoney(groupSum) + '</span></td></tr>';
+      var rows = g.items.map(function (inv) {
+        var overdue = isOverdue(inv);
+        var statusClass = overdue ? "overdue" : inv.status;
+        return '<tr>' +
+          '<td class="cell-title">' + escapeHtml(clientName(inv.clientId)) + '</td>' +
+          '<td>' + escapeHtml(inv.note || "—") + '</td>' +
+          '<td class="num">' + fmtMoney(inv.amount) + '</td>' +
+          '<td>' + fmtDateHuman(inv.dueDate) + '</td>' +
+          '<td><span class="pill ' + statusClass + '"><span class="pill-dot"></span>' + statusLabelInvoice(inv) + '</span></td>' +
+          '<td><div class="row-actions">' +
+            (inv.status === "unpaid" ? '<button class="btn btn-sm" data-mark-paid="' + inv.id + '">' + t("Позначити оплаченим") + '</button>' : '<button class="btn btn-sm btn-ghost" data-mark-unpaid="' + inv.id + '">' + t("Скасувати оплату") + '</button>') +
+            '<button class="icon-btn" data-edit-invoice="' + inv.id + '" title="' + t("Редагувати") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
+            '<button class="icon-btn" data-del-invoice="' + inv.id + '" title="' + t("Видалити") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button></div></td></tr>';
+      }).join("");
+      return header + rows;
     }).join("");
 
     document.getElementById("nav-count-invoices").textContent = all.filter(function (i) { return i.status === "unpaid"; }).length || "";
