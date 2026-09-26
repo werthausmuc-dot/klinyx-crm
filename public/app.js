@@ -1070,7 +1070,9 @@
 
       var dayJobs = jobsByDate[dateStr] || [];
       var dots = dayJobs.slice(0, 4).map(function (j) {
-        return '<span class="cal-dot ' + (j.status === "done" ? "done" : j.status === "cancelled" ? "cancelled" : "") + '"></span>';
+        var dotTitle = clientName(j.clientId) + (j.service ? " — " + t(j.service) : "") + " · " + statusLabelJob(j.status) +
+          (j.status === "cancelled" && j.cancelReason ? " (" + j.cancelReason + ")" : "");
+        return '<span class="cal-dot ' + (j.status === "done" ? "done" : j.status === "cancelled" ? "cancelled" : "") + '" title="' + escapeHtml(dotTitle) + '"></span>';
       }).join("");
       var more = dayJobs.length > 4 ? '<span class="cal-more">+' + (dayJobs.length - 4) + '</span>' : "";
 
@@ -1184,15 +1186,17 @@
   function renderAgenda() {
     var listEl = document.getElementById("agenda-list");
     var titleEl = document.getElementById("agenda-title");
-    var jobs = jobsSorted().filter(function (j) { return j.status !== "cancelled"; });
     var items;
     if (state.selectedDay) {
+      // A day the person explicitly picked on the calendar should show
+      // everything that happened that day, cancelled jobs included — that's
+      // the only place a cancelled job's decline reason can be seen.
       titleEl.textContent = fmtDateHuman(state.selectedDay) + t(" — завдання");
-      items = jobs.filter(function (j) { return j.date === state.selectedDay; });
+      items = jobsSorted().filter(function (j) { return j.date === state.selectedDay; });
     } else {
       titleEl.textContent = t("Найближчі завдання");
       var todayS = todayStr();
-      items = jobs.filter(function (j) { return j.date >= todayS; }).slice(0, 8);
+      items = jobsSorted().filter(function (j) { return j.status !== "cancelled" && j.date >= todayS; }).slice(0, 8);
     }
     if (!items.length) {
       listEl.innerHTML = '<div class="empty-note">' + t("Немає запланованих завдань") + (state.selectedDay ? t(" на цей день") : "") + '.</div>';
@@ -1203,7 +1207,9 @@
       return '<div class="agenda-item clickable" data-job="' + j.id + '" style="cursor:pointer;">' +
         '<div class="agenda-date">' + fmtDateHuman(j.date) + (j.time ? '<b>' + j.time + '</b>' : "") + '</div>' +
         '<div class="agenda-main"><div class="title">' + repeatIcon + escapeHtml(clientName(j.clientId)) + '</div>' +
-        '<div class="meta">' + escapeHtml(j.service ? t(j.service) : "") + (j.address ? " · " + escapeHtml(j.address) : "") + (assigneeName(j.assignedTo) ? " · 👤 " + escapeHtml(assigneeName(j.assignedTo)) : "") + '</div></div>' +
+        '<div class="meta">' + escapeHtml(j.service ? t(j.service) : "") + (j.address ? " · " + escapeHtml(j.address) : "") + (assigneeName(j.assignedTo) ? " · 👤 " + escapeHtml(assigneeName(j.assignedTo)) : "") + '</div>' +
+        (j.status === "cancelled" && j.cancelReason ? '<div class="meta" style="color:var(--danger); white-space:normal;">' + t("Причина: ") + autoTranslateHtml(j.cancelReason) + '</div>' : '') +
+        '</div>' +
         '<div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">' +
           '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span>' +
           '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? t("оплачено") : t("не оплачено")) + '</span>' +
