@@ -98,8 +98,15 @@ function clean(body, existing) {
     else if (typeof body.price === "number") data.price = body.price;
     else if (typeof body.price === "string" && body.price.trim() !== "" && !Number.isNaN(Number(body.price))) data.price = Number(body.price);
     if (typeof body.notes === "string") data.notes = body.notes.trim();
-    if (STATUSES.includes(body.status)) data.status = body.status;
+    if (STATUSES.includes(body.status)) {
+        data.status = body.status;
+        // Leaving the "cancelled" status behind clears any decline reason it
+        // carried, unless the caller is explicitly setting a new one in the
+        // same request (e.g. re-declining with a different reason).
+        if (body.status !== "cancelled" && body.cancelReason === undefined) data.cancelReason = "";
+    }
     if (!existing && !data.status) data.status = "scheduled";
+    if (typeof body.cancelReason === "string") data.cancelReason = body.cancelReason.trim();
     if (typeof body.assignedTo === "string" || body.assignedTo === null) data.assignedTo = body.assignedTo || null;
     if (typeof body.paid === "boolean") data.paid = body.paid;
     if (!existing && data.paid === undefined) data.paid = false;
