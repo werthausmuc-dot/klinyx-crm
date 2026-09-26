@@ -65,6 +65,11 @@
     " — завдання": " — Aufträge", "Найближчі завдання": "Nächste Aufträge",
     "Немає запланованих завдань": "Keine geplanten Aufträge", " на цей день": " an diesem Tag",
     "завдання": "Auftrag", "Прострочено: ": "Überfällig: ",
+    "Відмовити": "Ablehnen", "Причина відмови": "Grund der Ablehnung",
+    "Вкажіть причину відмови:": "Bitte Grund der Ablehnung angeben:",
+    "Вкажіть причину відмови": "Bitte Grund der Ablehnung angeben",
+    "Причина: ": "Grund: ", "Завдання відхилено": "Auftrag abgelehnt",
+    "Напр. клієнт відмовився, поганий стан об'єкта...": "Z. B. Kunde hat abgesagt, schlechter Zustand des Objekts...",
     "Нічого термінового — усе під контролем.": "Nichts Dringendes — alles unter Kontrolle.",
     "Позначити оплаченим": "Als bezahlt markieren", "Скасувати оплату": "Zahlung stornieren",
     "Рахунок позначено оплаченим": "Rechnung als bezahlt markiert",
@@ -269,6 +274,11 @@
       " на цей день": " لهذا اليوم",
       "завдання": "مهمة",
       "Прострочено: ": "متأخر: ",
+      "Відмовити": "رفض", "Причина відмови": "سبب الرفض",
+      "Вкажіть причину відмови:": "يرجى إدخال سبب الرفض:",
+      "Вкажіть причину відмови": "يرجى إدخال سبب الرفض",
+      "Причина: ": "السبب: ", "Завдання відхилено": "تم رفض المهمة",
+      "Напр. клієнт відмовився, поганий стан об'єкта...": "مثال: ألغى العميل، حالة سيئة للموقع...",
       "Нічого термінового — усе під контролем.": "لا شيء عاجل — كل شيء تحت السيطرة.",
       "Позначити оплаченим": "تعليم كمدفوع",
       "Скасувати оплату": "إلغاء الدفع",
@@ -1197,8 +1207,23 @@
         '<div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">' +
           '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span>' +
           '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? t("оплачено") : t("не оплачено")) + '</span>' +
+          (j.status === "scheduled" ? '<button class="btn btn-sm btn-ghost" data-decline-job="' + j.id + '">' + t("Відмовити") + '</button>' : '') +
         '</div></div>';
     }).join("");
+    listEl.querySelectorAll("[data-decline-job]").forEach(function (btn) {
+      btn.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var jobId = btn.getAttribute("data-decline-job");
+        var reason = prompt(t("Вкажіть причину відмови:"));
+        if (reason === null) return;
+        reason = reason.trim();
+        if (!reason) { toast(t("Вкажіть причину відмови"), true); return; }
+        api("PATCH", "/api/jobs/" + jobId, { status: "cancelled", cancelReason: reason })
+          .then(function () { toast(t("Завдання відхилено")); loadAll(); })
+          .catch(function (err) { toast(err.message, true); });
+      });
+    });
     listEl.querySelectorAll("[data-job]").forEach(function (el) {
       el.addEventListener("click", function () { openJobModal(el.getAttribute("data-job")); });
     });
@@ -1972,7 +1997,9 @@
           '<div class="drawer-section"><h4 style="display:flex; justify-content:space-between; align-items:center;">' + t("Завдання") + ' <button class="btn btn-sm" id="dr-add-job">' + t("+ Додати") + '</button></h4>' +
             (history.length ? history.map(function (j) {
               var repeatIcon = j.seriesId ? '🔁 ' : '';
-              return '<div class="job-row"><div class="agenda-date">' + fmtDateHuman(j.date) + '</div><div class="agenda-main"><div class="title">' + repeatIcon + escapeHtml(j.service ? t(j.service) : "") + '</div></div>' +
+              return '<div class="job-row"><div class="agenda-date">' + fmtDateHuman(j.date) + '</div><div class="agenda-main"><div class="title">' + repeatIcon + escapeHtml(j.service ? t(j.service) : "") + '</div>' +
+                (j.status === "cancelled" && j.cancelReason ? '<div class="meta" style="color:var(--danger);">' + t("Причина: ") + autoTranslateHtml(j.cancelReason) + '</div>' : '') +
+                '</div>' +
                 '<div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">' +
                   '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span>' +
                   '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? t("оплачено") : t("не оплачено")) + '</span>' +
@@ -1999,7 +2026,7 @@
       clientId: presets.clientId || (clientsList()[0] && clientsList()[0].id) || "",
       date: presets.date || state.selectedDay || todayStr(),
       time: "10:00", service: SERVICE_TYPES[0], address: "", price: "", status: "scheduled", notes: "", assignedTo: null,
-      paid: false, recurrence: null
+      paid: false, recurrence: null, cancelReason: ""
     };
     var root = document.getElementById("modal-root");
     root.innerHTML =
@@ -2018,6 +2045,10 @@
             '<div class="field"><label>' + t("Вартість, €") + '</label><input type="number" id="f-price" value="' + escapeHtml(j.price) + '" min="0" step="1"></div>' +
             '<div class="field"><label>' + t("Статус") + '</label><select id="f-status">' +
               ["scheduled", "done", "cancelled"].map(function (s) { return '<option value="' + s + '"' + (j.status === s ? " selected" : "") + '>' + statusLabelJob(s) + '</option>'; }).join("") + '</select></div></div>' +
+          '<div class="field" id="f-cancel-reason-wrap" style="' + (j.status === "cancelled" ? '' : 'display:none;') + '">' +
+            '<label>' + t("Причина відмови") + '</label>' +
+            '<textarea id="f-cancel-reason" placeholder="' + t("Напр. клієнт відмовився, поганий стан об'єкта...") + '">' + escapeHtml(j.cancelReason || "") + '</textarea>' +
+          '</div>' +
           '<div class="field"><label>' + t("Виконавець") + '</label><select id="f-assignee"><option value="">' + t("— не призначено —") + '</option>' +
             state.roster.map(function (u) {
               var tag = (u.role === "admin" ? t(" (адмін)") : "") + (u.telegramLinked ? " · Telegram ✓" : t(" · без Telegram"));
@@ -2052,6 +2083,9 @@
     document.getElementById("ov-save").addEventListener("click", function () {
       var date = document.getElementById("f-date").value;
       if (!date) { toast("Вкажіть дату", true); return; }
+      var status = document.getElementById("f-status").value;
+      var cancelReason = document.getElementById("f-cancel-reason").value.trim();
+      if (status === "cancelled" && !cancelReason) { toast(t("Вкажіть причину відмови"), true); return; }
       var data = {
         clientId: document.getElementById("f-client").value,
         date: date,
@@ -2059,7 +2093,8 @@
         service: document.getElementById("f-service").value,
         address: document.getElementById("f-address").value.trim(),
         price: document.getElementById("f-price").value ? Number(document.getElementById("f-price").value) : null,
-        status: document.getElementById("f-status").value,
+        status: status,
+        cancelReason: status === "cancelled" ? cancelReason : "",
         notes: document.getElementById("f-notes").value.trim(),
         assignedTo: document.getElementById("f-assignee").value || null,
         paid: document.getElementById("f-paid").value === "true"
@@ -2082,6 +2117,9 @@
     });
     document.getElementById("f-recur-freq").addEventListener("change", function (e) {
       document.getElementById("f-recur-until-wrap").style.display = e.target.value ? "" : "none";
+    });
+    document.getElementById("f-status").addEventListener("change", function (e) {
+      document.getElementById("f-cancel-reason-wrap").style.display = e.target.value === "cancelled" ? "" : "none";
     });
   }
 
