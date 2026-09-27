@@ -26,6 +26,7 @@ require("./routes/telegram")(router);
 require("./routes/roadmap")(router);
 require("./routes/platforms")(router);
 require("./routes/dayplans")(router);
+require("./routes/timeoff")(router);
 
 async function getCurrentUser(req) {
   const sid = getSessionIdFromRequest(req, parseCookies);
