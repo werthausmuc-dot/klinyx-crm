@@ -102,6 +102,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
         <span data-i18n="Замовлення">Замовлення</span>
       </button>
+      <button class="nav-item" data-view="timeoff">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8 14l2.5 2.5L16 11"/></svg>
+        <span data-i18n="Вихідні">Вихідні</span>
+      </button>
     </nav>
     <div class="sidebar-footer">
       <div class="lang-switch">
@@ -349,6 +353,33 @@
       </div>
       <div class="widget-grid" id="orders-grid"></div>
       <div class="empty-note" id="orders-empty" hidden data-i18n="Платформ ще немає — додай першу кнопкою вище.">Платформ ще немає — додай першу кнопкою вище.</div>
+    </section>
+
+    <!-- DAYS OFF -->
+    <section class="view" id="view-timeoff">
+      <div class="page-header">
+        <div><h1 data-i18n="Вихідні">Вихідні</h1><p class="sub" data-i18n="Позначайте дні, коли ви не працюєте, — це допоможе правильно розподілити замовлення">Позначайте дні, коли ви не працюєте, — це допоможе правильно розподілити замовлення</p></div>
+        <div class="header-actions" id="timeoff-worker-picker-wrap" hidden>
+          <select id="timeoff-worker-select" style="width:auto; min-width:200px;"></select>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3 id="timeoff-cal-title">—</h3>
+          <div class="cal-nav">
+            <button class="icon-btn" id="timeoff-cal-prev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <div class="cal-month-label" id="timeoff-cal-month-label">—</div>
+            <button class="icon-btn" id="timeoff-cal-next"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+          </div>
+        </div>
+        <div class="cal-grid" id="timeoff-cal-dow-row"></div>
+        <div class="cal-grid" id="timeoff-cal-grid" style="margin-top:5px;"></div>
+        <p class="auth-sub" style="margin-top:10px;" data-i18n="Натисніть на день, щоб позначити його вихідним або знову робочим.">Натисніть на день, щоб позначити його вихідним або знову робочим.</p>
+      </div>
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-head"><h3 id="timeoff-day-title">—</h3></div>
+        <div id="timeoff-day-list"></div>
+      </div>
     </section>
 
   </main>

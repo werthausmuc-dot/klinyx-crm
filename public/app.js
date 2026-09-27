@@ -222,7 +222,15 @@
     "Додати пункт": "Punkt hinzufügen",
     "Плану розвитку ще немає.": "Noch kein Entwicklungsplan.",
     "Швидкий перехід на платформи, де шукаємо замовлення": "Schnellzugriff auf Plattformen, auf denen wir Aufträge suchen",
-    "Додані вручну": "Manuell hinzugefügt", "Рекомендовані (авто)": "Empfohlen (automatisch)"
+    "Додані вручну": "Manuell hinzugefügt", "Рекомендовані (авто)": "Empfohlen (automatisch)",
+    "Вихідні": "Freie Tage",
+    "Позначайте дні, коли ви не працюєте, — це допоможе правильно розподілити замовлення": "Markieren Sie Tage, an denen Sie nicht arbeiten — das hilft, Aufträge richtig zu verteilen",
+    "Натисніть на день, щоб позначити його вихідним або знову робочим.": "Klicken Sie auf einen Tag, um ihn als frei oder wieder als Arbeitstag zu markieren.",
+    "Графік: ": "Kalender: ",
+    " — хто вихідний": " — wer frei hat",
+    "Цього дня ніхто не позначив себе вихідним.": "An diesem Tag hat sich niemand als frei markiert.",
+    "Вихідний": "Frei",
+    "У виконавця цього дня вихідний.": "Der Mitarbeiter hat an diesem Tag frei."
   };
   var I18N = {
     de: I18N_DE,
@@ -543,6 +551,14 @@
       "Швидкий перехід на платформи, де шукаємо замовлення": "وصول سريع إلى المنصات التي نبحث فيها عن الطلبات",
       "Додані вручну": "مضافة يدويًا",
       "Рекомендовані (авто)": "موصى بها (تلقائي)",
+      "Вихідні": "أيام الإجازة",
+      "Позначайте дні, коли ви не працюєте, — це допоможе правильно розподілити замовлення": "حدد الأيام التي لا تعمل فيها — سيساعد ذلك في توزيع الطلبات بشكل صحيح",
+      "Натисніть на день, щоб позначити його вихідним або знову робочим.": "انقر على يوم لتحديده كإجازة أو كيوم عمل مرة أخرى.",
+      "Графік: ": "الجدول: ",
+      " — хто вихідний": " — من في إجازة",
+      "Цього дня ніхто не позначив себе вихідним.": "لم يحدد أحد نفسه في إجازة هذا اليوم.",
+      "Вихідний": "إجازة",
+      "У виконавця цього дня вихідний.": "الموظف المكلف في إجازة هذا اليوم."
     }
   };
   function t(s) {
@@ -666,6 +682,7 @@
     roadmap: new Map(),
     platforms: new Map(),
     dayPlans: new Map(),
+    timeoff: new Map(),
     users: [],
     roster: [],
     telegram: null,
@@ -677,7 +694,11 @@
     clientFilter: "all",
     clientQuery: "",
     invoiceFilter: "all",
-    ordersTab: "manual"
+    ordersTab: "manual",
+    timeoffCalYear: new Date().getFullYear(),
+    timeoffCalMonth: new Date().getMonth(),
+    timeoffWorkerId: null,
+    timeoffSelectedDay: null
   };
 
   function todayStr() { return fmtDate(new Date()); }
@@ -935,7 +956,8 @@
       state.me && state.me.role === "admin" ? api("GET", "/api/inventory") : Promise.resolve(null),
       api("GET", "/api/roadmap"),
       api("GET", "/api/platforms"),
-      state.me && state.me.role === "admin" ? api("GET", "/api/dayplans") : Promise.resolve(null)
+      state.me && state.me.role === "admin" ? api("GET", "/api/dayplans") : Promise.resolve(null),
+      api("GET", "/api/timeoff")
     ]).then(function (res) {
       state.clients = new Map(res[0].map(function (c) { return [c.id, c]; }));
       state.jobs = new Map(res[1].map(function (j) { return [j.id, j]; }));
@@ -946,6 +968,7 @@
       state.roadmap = new Map((res[6] || []).map(function (r) { return [r.id, r]; }));
       state.platforms = new Map((res[7] || []).map(function (p) { return [p.id, p]; }));
       if (res[8]) state.dayPlans = new Map(res[8].map(function (d) { return [d.id, d]; }));
+      state.timeoff = new Map((res[9] || []).map(function (o) { return [o.id, o]; }));
       render();
     }).catch(function (err) {
       if (err && err.code !== "not_authenticated") toast(err.message || t("Не вдалося оновити дані"), true);
@@ -1090,6 +1113,108 @@
         renderDayPlan();
       });
     });
+  }
+
+  /* ============ days off ============ */
+  // A worker's own simple availability calendar: one record per (userId,
+  // date) means that person is off that day. Admins get a dropdown to view
+  // and edit anyone's calendar (e.g. to enter approved leave for them);
+  // everyone else only ever sees and edits their own. The "who's off"
+  // panel below the calendar always looks at everyone's records for the
+  // selected day, regardless of whose calendar is currently open, so an
+  // admin picking a job date can see the whole team's availability at once.
+  function timeoffList() { return Array.from(state.timeoff.values()); }
+  function isOffDay(userId, date) {
+    return timeoffList().some(function (o) { return o.userId === userId && o.date === date; });
+  }
+  function timeoffCurrentWorkerId() {
+    if (state.me.role !== "admin") return state.me.id;
+    if (state.timeoffWorkerId && state.roster.some(function (u) { return u.id === state.timeoffWorkerId; })) return state.timeoffWorkerId;
+    return (state.roster[0] && state.roster[0].id) || state.me.id;
+  }
+
+  function renderTimeoff() {
+    state.timeoffWorkerId = timeoffCurrentWorkerId();
+    var pickerWrap = document.getElementById("timeoff-worker-picker-wrap");
+    if (state.me.role === "admin") {
+      pickerWrap.hidden = false;
+      var sel = document.getElementById("timeoff-worker-select");
+      sel.innerHTML = state.roster.map(function (u) {
+        return '<option value="' + u.id + '"' + (u.id === state.timeoffWorkerId ? " selected" : "") + '>' + escapeHtml(u.name) + '</option>';
+      }).join("");
+    } else {
+      pickerWrap.hidden = true;
+    }
+    var worker = state.roster.find(function (u) { return u.id === state.timeoffWorkerId; });
+    document.getElementById("timeoff-cal-title").textContent = worker ? t("Графік: ") + worker.name : "";
+    if (!state.timeoffSelectedDay) state.timeoffSelectedDay = todayStr();
+    renderTimeoffCalendar();
+    renderTimeoffDayList();
+  }
+
+  function renderTimeoffCalendar() {
+    document.getElementById("timeoff-cal-month-label").textContent = MONTHS[state.lang][state.timeoffCalMonth] + " " + state.timeoffCalYear;
+    document.getElementById("timeoff-cal-dow-row").innerHTML = DOW[state.lang].map(function (d) { return '<div class="cal-dow">' + d + '</div>'; }).join("");
+
+    var first = new Date(state.timeoffCalYear, state.timeoffCalMonth, 1);
+    var startOffset = (first.getDay() + 6) % 7;
+    var daysInMonth = new Date(state.timeoffCalYear, state.timeoffCalMonth + 1, 0).getDate();
+    var prevDays = new Date(state.timeoffCalYear, state.timeoffCalMonth, 0).getDate();
+    var todayS = todayStr();
+    var workerId = state.timeoffWorkerId;
+
+    var cells = [];
+    var totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+    for (var i = 0; i < totalCells; i++) {
+      var dayNum, monthOffset = 0, muted = false;
+      if (i < startOffset) { dayNum = prevDays - startOffset + i + 1; muted = true; monthOffset = -1; }
+      else if (i >= startOffset + daysInMonth) { dayNum = i - startOffset - daysInMonth + 1; muted = true; monthOffset = 1; }
+      else { dayNum = i - startOffset + 1; }
+
+      var cellMonth = state.timeoffCalMonth + monthOffset;
+      var cellYear = state.timeoffCalYear;
+      if (cellMonth < 0) { cellMonth = 11; cellYear--; }
+      if (cellMonth > 11) { cellMonth = 0; cellYear++; }
+      var dateStr = cellYear + "-" + pad2(cellMonth + 1) + "-" + pad2(dayNum);
+
+      var cls = "cal-cell" + (muted ? " muted" : "") + (dateStr === todayS ? " today" : "") +
+        (dateStr === state.timeoffSelectedDay ? " selected" : "") + (isOffDay(workerId, dateStr) ? " off" : "");
+      cells.push('<div class="' + cls + '" data-date="' + dateStr + '"><div class="cal-daynum">' + dayNum + '</div></div>');
+    }
+    document.getElementById("timeoff-cal-grid").innerHTML = cells.join("");
+
+    document.querySelectorAll("#timeoff-cal-grid .cal-cell").forEach(function (el) {
+      el.addEventListener("click", function () { toggleTimeoffDay(el.getAttribute("data-date")); });
+    });
+  }
+
+  function renderTimeoffDayList() {
+    var day = state.timeoffSelectedDay || todayStr();
+    document.getElementById("timeoff-day-title").textContent = fmtDateHuman(day) + t(" — хто вихідний");
+    var off = state.roster.filter(function (u) { return isOffDay(u.id, day); });
+    var listEl = document.getElementById("timeoff-day-list");
+    if (!off.length) {
+      listEl.innerHTML = '<div class="empty-note">' + t("Цього дня ніхто не позначив себе вихідним.") + '</div>';
+      return;
+    }
+    listEl.innerHTML = off.map(function (u) {
+      return '<div class="job-row"><div class="agenda-main"><div class="title">' + escapeHtml(u.name) + '</div></div>' +
+        '<span class="pill unpaid"><span class="pill-dot"></span>' + t("Вихідний") + '</span></div>';
+    }).join("");
+  }
+
+  function toggleTimeoffDay(dateStr) {
+    var workerId = state.timeoffWorkerId;
+    state.timeoffSelectedDay = dateStr;
+    api("POST", "/api/timeoff/toggle", { date: dateStr, userId: workerId }).then(function (res) {
+      if (res && res.removed) {
+        state.timeoff.delete(res.id);
+      } else if (res && res.id) {
+        state.timeoff.set(res.id, res);
+      }
+      renderTimeoffCalendar();
+      renderTimeoffDayList();
+    }).catch(function (err) { toast(err.message, true); });
   }
 
   /* ============ dashboard: day plan (admin-only, per-date to-dos) ============ */
@@ -2062,6 +2187,9 @@
             }).join("") +
           '</select>' +
           '<p class="auth-sub" style="margin-top:6px;">' + t("\"· без Telegram\" — сповіщення про призначення не дійде, доки людина не під'єднає бота.") + '</p></div>' +
+          '<div class="field" id="f-assignee-timeoff-warn" style="display:none;">' +
+            '<p class="auth-sub" style="color:var(--warning); white-space:normal;">⚠ ' + t("У виконавця цього дня вихідний.") + '</p>' +
+          '</div>' +
           '<div class="field-row">' +
             '<div class="field"><label>' + t("Оплата") + '</label><select id="f-paid">' +
               '<option value="false"' + (!j.paid ? " selected" : "") + '>' + t("не оплачено") + '</option>' +
@@ -2127,6 +2255,15 @@
     document.getElementById("f-status").addEventListener("change", function (e) {
       document.getElementById("f-cancel-reason-wrap").style.display = e.target.value === "cancelled" ? "" : "none";
     });
+    function updateAssigneeTimeoffWarning() {
+      var assigneeId = document.getElementById("f-assignee").value;
+      var date = document.getElementById("f-date").value;
+      var warn = assigneeId && date && isOffDay(assigneeId, date);
+      document.getElementById("f-assignee-timeoff-warn").style.display = warn ? "" : "none";
+    }
+    document.getElementById("f-assignee").addEventListener("change", updateAssigneeTimeoffWarning);
+    document.getElementById("f-date").addEventListener("change", updateAssigneeTimeoffWarning);
+    updateAssigneeTimeoffWarning();
   }
 
   /* ============ modals: invoice ============ */
@@ -2450,6 +2587,7 @@
     if (state.view === "team") renderTeam();
     if (state.view === "roadmap") renderRoadmap();
     if (state.view === "orders") renderOrders();
+    if (state.view === "timeoff") renderTimeoff();
     document.getElementById("nav-count-clients").textContent = state.clients.size || "";
     document.getElementById("nav-count-invoices").textContent = invoicesList().filter(function (i) { return i.status === "unpaid"; }).length || "";
     if (state.me.role === "admin") {
@@ -2495,6 +2633,20 @@
   document.getElementById("cal-next").addEventListener("click", function () {
     state.calMonth++; if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
     renderDashboard();
+  });
+
+  document.getElementById("timeoff-cal-prev").addEventListener("click", function () {
+    state.timeoffCalMonth--; if (state.timeoffCalMonth < 0) { state.timeoffCalMonth = 11; state.timeoffCalYear--; }
+    renderTimeoffCalendar();
+  });
+  document.getElementById("timeoff-cal-next").addEventListener("click", function () {
+    state.timeoffCalMonth++; if (state.timeoffCalMonth > 11) { state.timeoffCalMonth = 0; state.timeoffCalYear++; }
+    renderTimeoffCalendar();
+  });
+  document.getElementById("timeoff-worker-select").addEventListener("change", function (e) {
+    state.timeoffWorkerId = e.target.value;
+    state.timeoffSelectedDay = null;
+    renderTimeoff();
   });
 
   document.getElementById("client-search").addEventListener("input", function (e) { state.clientQuery = e.target.value; renderClients(); });
