@@ -143,6 +143,9 @@
     "Завдання оновлено": "Auftrag aktualisiert", "Завдання заплановано": "Auftrag geplant",
     "Завдання виконано — рахунок додано до неоплачених": "Auftrag erledigt — Rechnung zu den unbezahlten hinzugefügt",
     "рахунок виставлено": "Rechnung ausgestellt", "рахунок не виставлено": "Rechnung nicht ausgestellt",
+    "У завданні не вказана ціна. Вкажіть суму рахунку, €:": "Für den Auftrag ist kein Preis angegeben. Bitte Rechnungsbetrag angeben, €:",
+    "Вкажіть коректну суму": "Bitte einen gültigen Betrag angeben",
+    "Рахунок виставлено": "Rechnung ausgestellt",
     "Видалити це завдання?": "Diesen Auftrag löschen?", "Завдання видалено": "Auftrag gelöscht",
     "Редагувати рахунок": "Rechnung bearbeiten", "Новий рахунок": "Neue Rechnung",
     "Сума, € *": "Betrag, € *", "Дата виставлення": "Ausstellungsdatum",
@@ -420,6 +423,9 @@
       "Завдання заплановано": "تمت جدولة المهمة",
       "Завдання виконано — рахунок додано до неоплачених": "تم إنجاز المهمة — تمت إضافة فاتورة إلى غير المدفوعة",
       "рахунок виставлено": "تم إصدار الفاتورة", "рахунок не виставлено": "لم تُصدر الفاتورة",
+      "У завданні не вказана ціна. Вкажіть суму рахунку, €:": "لم يتم تحديد سعر للمهمة. يرجى إدخال مبلغ الفاتورة، €:",
+      "Вкажіть коректну суму": "يرجى إدخال مبلغ صحيح",
+      "Рахунок виставлено": "تم إصدار الفاتورة",
       "Видалити це завдання?": "حذف هذه المهمة؟",
       "Завдання видалено": "تم حذف المهمة",
       "Редагувати рахунок": "تعديل الفاتورة",
@@ -1000,6 +1006,23 @@
   }
   function invoicesList() { return Array.from(state.invoices.values()); }
   function invoiceForJob(jobId) { return invoicesList().find(function (i) { return i.jobId === jobId; }) || null; }
+
+  // One-click "issue the invoice now" for a done job that isn't billed yet.
+  // Uses the job's own price when it has one; otherwise asks for an amount
+  // (covers jobs completed with no price set at the time).
+  function quickCreateInvoice(jobId) {
+    var job = state.jobs.get(jobId);
+    var amount = job && job.price ? Number(job.price) : null;
+    if (!amount || amount <= 0) {
+      var input = prompt(t("У завданні не вказана ціна. Вкажіть суму рахунку, €:"));
+      if (input === null) return;
+      amount = Number(String(input).replace(",", "."));
+      if (!amount || amount <= 0) { toast(t("Вкажіть коректну суму"), true); return; }
+    }
+    api("POST", "/api/jobs/" + jobId + "/invoice", { amount: amount })
+      .then(function () { toast(t("Рахунок виставлено")); loadAll(); })
+      .catch(function (err) { toast(err.message, true); });
+  }
   function inventoryList() { return Array.from(state.inventory.values()); }
   function roadmapList() { return Array.from(state.roadmap.values()); }
   function platformsList() { return Array.from(state.platforms.values()); }
@@ -1347,9 +1370,17 @@
           '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span>' +
           '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? t("оплачено") : t("не оплачено")) + '</span>' +
           (j.status === "done" ? '<span class="pill ' + (invoiceForJob(j.id) ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (invoiceForJob(j.id) ? t("рахунок виставлено") : t("рахунок не виставлено")) + '</span>' : '') +
+          (j.status === "done" && !invoiceForJob(j.id) ? '<button class="btn btn-sm" data-quick-invoice="' + j.id + '">' + t("Виставити рахунок") + '</button>' : '') +
           (j.status === "scheduled" ? '<button class="btn btn-sm btn-ghost" data-decline-job="' + j.id + '">' + t("Відмовити") + '</button>' : '') +
         '</div></div>';
     }).join("");
+    listEl.querySelectorAll("[data-quick-invoice]").forEach(function (btn) {
+      btn.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        quickCreateInvoice(btn.getAttribute("data-quick-invoice"));
+      });
+    });
     listEl.querySelectorAll("[data-decline-job]").forEach(function (btn) {
       btn.addEventListener("mousedown", function (e) { e.stopPropagation(); });
       btn.addEventListener("click", function (e) {
@@ -2144,6 +2175,7 @@
                   '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span>' +
                   '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? t("оплачено") : t("не оплачено")) + '</span>' +
                   (j.status === "done" ? '<span class="pill ' + (invoiceForJob(j.id) ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (invoiceForJob(j.id) ? t("рахунок виставлено") : t("рахунок не виставлено")) + '</span>' : '') +
+                  (j.status === "done" && !invoiceForJob(j.id) ? '<button class="btn btn-sm" data-quick-invoice="' + j.id + '">' + t("Виставити рахунок") + '</button>' : '') +
                 '</div></div>';
             }).join("") : '<div class="empty-note">' + t("Ще немає завдань") + '</div>') + '</div>' +
           '<div class="drawer-section"><h4 style="display:flex; justify-content:space-between; align-items:center;">' + t("Рахунки") + ' <button class="btn btn-sm" id="dr-add-invoice">' + t("+ Додати") + '</button></h4>' +
@@ -2157,6 +2189,16 @@
     document.getElementById("dr-backdrop").addEventListener("click", close);
     document.getElementById("dr-add-job").addEventListener("click", function () { close(); openJobModal(null, { clientId: id }); });
     document.getElementById("dr-add-invoice").addEventListener("click", function () { close(); openInvoiceModal(null, { clientId: id }); });
+    root.querySelectorAll("[data-quick-invoice]").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        // Close first: the drawer's job/invoice lists are a static snapshot
+        // from when it opened, so leaving it open would show a stale
+        // "не виставлено" pill right after the invoice was created.
+        close();
+        quickCreateInvoice(btn.getAttribute("data-quick-invoice"));
+      });
+    });
   }
 
   /* ============ modals: job ============ */
