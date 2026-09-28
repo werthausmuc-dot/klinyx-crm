@@ -87,6 +87,39 @@ async function ensureRecurringInstances() {
   }
 }
 
+// ---- auto-invoice on completion ----
+// The moment a job's status becomes "done", its price should show up as
+// money owed: we create an unpaid invoice for the client automatically so
+// nobody has to remember to raise one by hand. Guards:
+//  - only fires on the transition INTO "done" (prevStatus !== "done"),
+//    so re-saving an already-done job never creates a second invoice;
+//  - only fires when the job actually has a positive price — an invoice
+//    for €0 would just get rejected by the invoices API anyway;
+//  - double-checks no invoice already references this job (belt and
+//    braces, in case of a retried request or a future extra call site).
+// Returns the created invoice, or null if nothing was created.
+async function maybeAutoInvoiceForDoneJob(job, prevStatus) {
+  if (!job || job.status !== "done" || prevStatus === "done") return null;
+  const price = Number(job.price);
+  if (!price || price <= 0) return null;
+  const invoices = await store.list("invoices");
+  if (invoices.some((inv) => inv.jobId === job.id)) return null;
+  const today = fmtDateUTC(new Date());
+  const descParts = [];
+  if (job.service) descParts.push(job.service);
+  if (job.address) descParts.push(job.address);
+  return store.create("invoices", {
+    clientId: job.clientId,
+    amount: price,
+    issueDate: today,
+    dueDate: today,
+    status: "unpaid",
+    note: descParts.join(", "),
+    jobId: job.id,
+    createdBy: job.createdBy || null
+  });
+}
+
 function clean(body, existing) {
     const data = {};
     if (typeof body.clientId === "string") data.clientId = body.clientId;
@@ -137,7 +170,8 @@ module.exports = function registerJobRoutes(router) {
           if (!data.date) return sendJson(res, 400, { error: "invalid_input", message: "Вкажіть дату у форматі РРРР-ММ-ДД." });
           data.createdBy = req.user.id;
           const created = await store.create("jobs", data);
-          sendJson(res, 201, created);
+          const autoInvoice = await maybeAutoInvoiceForDoneJob(created, null);
+          sendJson(res, 201, Object.assign({}, created, { autoInvoiceCreated: !!autoInvoice }));
           notify.onJobCreated(created, req.user);
     });
 
@@ -151,7 +185,8 @@ module.exports = function registerJobRoutes(router) {
                   return sendJson(res, 400, { error: "invalid_input", message: "Клієнта не знайдено." });
           }
           const updated = await store.update("jobs", params.id, patch);
-          sendJson(res, 200, updated);
+          const autoInvoice = await maybeAutoInvoiceForDoneJob(updated, existing.status);
+          sendJson(res, 200, Object.assign({}, updated, { autoInvoiceCreated: !!autoInvoice }));
           if ("assignedTo" in patch) notify.onJobAssigned(updated, existing.assignedTo || null);
     });
 
