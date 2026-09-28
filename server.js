@@ -27,6 +27,7 @@ require("./routes/roadmap")(router);
 require("./routes/platforms")(router);
 require("./routes/dayplans")(router);
 require("./routes/timeoff")(router);
+require("./routes/workhours")(router);
 
 async function getCurrentUser(req) {
   const sid = getSessionIdFromRequest(req, parseCookies);
