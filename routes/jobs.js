@@ -93,36 +93,61 @@ async function ensureRecurringInstances() {
 }
 
 // ---- auto-invoice on completion ----
-// The moment a job's status becomes "done", its price should show up as
-// money owed: we create an unpaid invoice for the client automatically so
-// nobody has to remember to raise one by hand. Guards:
-//  - only fires on the transition INTO "done" (prevStatus !== "done"),
-//    so re-saving an already-done job never creates a second invoice;
-//  - only fires when the job actually has a positive price — an invoice
-//    for €0 would just get rejected by the invoices API anyway;
-//  - double-checks no invoice already references this job (belt and
-//    braces, in case of a retried request or a future extra call site).
+// The moment a job's status is "done", its price should show up as money
+// owed: we create an unpaid invoice for the client automatically so nobody
+// has to remember to raise one by hand.
+function invoiceNoteForJob(job) {
+  const parts = [];
+  if (job.service) parts.push(job.service);
+  if (job.address) parts.push(job.address);
+  return parts.join(", ");
+}
+
+async function createInvoiceForJob(job, amount, createdBy) {
+  const today = fmtDateUTC(new Date());
+  return store.create("invoices", {
+    clientId: job.clientId,
+    amount,
+    issueDate: today,
+    dueDate: today,
+    status: "unpaid",
+    note: invoiceNoteForJob(job),
+    jobId: job.id,
+    createdBy: createdBy || job.createdBy || null
+  });
+}
+
+// Called right after a job is created/updated. Only fires when the job
+// actually has a positive price (an invoice for €0 would just get
+// rejected by the invoices API anyway) and no invoice already references
+// it — that second check is what makes this safe to call on every single
+// save of an already-done job, not just the moment it first becomes done.
 // Returns the created invoice, or null if nothing was created.
-async function maybeAutoInvoiceForDoneJob(job, prevStatus) {
-  if (!job || job.status !== "done" || prevStatus === "done") return null;
+async function maybeAutoInvoiceForDoneJob(job) {
+  if (!job || job.status !== "done") return null;
   const price = Number(job.price);
   if (!price || price <= 0) return null;
   const invoices = await store.list("invoices");
   if (invoices.some((inv) => inv.jobId === job.id)) return null;
-  const today = fmtDateUTC(new Date());
-  const descParts = [];
-  if (job.service) descParts.push(job.service);
-  if (job.address) descParts.push(job.address);
-  return store.create("invoices", {
-    clientId: job.clientId,
-    amount: price,
-    issueDate: today,
-    dueDate: today,
-    status: "unpaid",
-    note: descParts.join(", "),
-    jobId: job.id,
-    createdBy: job.createdBy || null
-  });
+  return createInvoiceForJob(job, price, job.createdBy);
+}
+
+// Catch-up pass, run on every GET /api/jobs (same lazy-generation pattern
+// as ensureRecurringInstances — no server-side cron on Render's free
+// plan). Covers jobs that were marked "done" before this feature existed,
+// or through any path that doesn't go through the PATCH handler below, so
+// they don't sit forever showing "рахунок не виставлено" until somebody
+// happens to re-save them.
+async function ensureInvoicesForDoneJobs(jobs) {
+  const candidates = jobs.filter((j) => j.status === "done" && Number(j.price) > 0);
+  if (!candidates.length) return;
+  const invoices = await store.list("invoices");
+  const invoiced = new Set(invoices.map((i) => i.jobId).filter(Boolean));
+  for (const job of candidates) {
+    if (invoiced.has(job.id)) continue;
+    await createInvoiceForJob(job, Number(job.price), job.createdBy);
+    invoiced.add(job.id);
+  }
 }
 
 function clean(body, existing) {
@@ -170,7 +195,9 @@ module.exports = function registerJobRoutes(router) {
     router.get("/api/jobs", async (req, res) => {
           if (!requireAuth(req, res)) return;
           await ensureRecurringInstances();
-          sendJson(res, 200, await store.list("jobs"));
+          const jobs = await store.list("jobs");
+          await ensureInvoicesForDoneJobs(jobs);
+          sendJson(res, 200, jobs);
     });
 
     router.post("/api/jobs", async (req, res) => {
@@ -182,7 +209,7 @@ module.exports = function registerJobRoutes(router) {
           if (!data.date) return sendJson(res, 400, { error: "invalid_input", message: "Вкажіть дату у форматі РРРР-ММ-ДД." });
           data.createdBy = req.user.id;
           const created = await store.create("jobs", data);
-          const autoInvoice = await maybeAutoInvoiceForDoneJob(created, null);
+          const autoInvoice = await maybeAutoInvoiceForDoneJob(created);
           sendJson(res, 201, Object.assign({}, created, { autoInvoiceCreated: !!autoInvoice }));
           notify.onJobCreated(created, req.user);
     });
@@ -197,7 +224,7 @@ module.exports = function registerJobRoutes(router) {
                   return sendJson(res, 400, { error: "invalid_input", message: "Клієнта не знайдено." });
           }
           const updated = await store.update("jobs", params.id, patch);
-          const autoInvoice = await maybeAutoInvoiceForDoneJob(updated, existing.status);
+          const autoInvoice = await maybeAutoInvoiceForDoneJob(updated);
           sendJson(res, 200, Object.assign({}, updated, { autoInvoiceCreated: !!autoInvoice }));
           if ("assignedTo" in patch) notify.onJobAssigned(updated, existing.assignedTo || null);
     });
@@ -225,5 +252,25 @@ module.exports = function registerJobRoutes(router) {
           }
           await store.remove("jobs", params.id);
           sendJson(res, 200, { ok: true });
+    });
+
+    // Quick one-click invoice creation for a job the automatic flow hasn't
+    // billed yet — e.g. a done job that had no price at the time, or one
+    // completed before auto-invoicing existed. Uses the job's own price
+    // unless the caller supplies an amount (for jobs with no price set).
+    router.post("/api/jobs/:id/invoice", async (req, res, params) => {
+          if (!requireAuth(req, res)) return;
+          const job = await store.get("jobs", params.id);
+          if (!job) return sendJson(res, 404, { error: "not_found" });
+          const invoices = await store.list("invoices");
+          if (invoices.some((inv) => inv.jobId === job.id)) {
+                return sendJson(res, 400, { error: "invalid_input", message: "Рахунок для цього завдання вже виставлено." });
+          }
+          const body = await readJsonBody(req);
+          let amount = typeof body.amount === "number" ? body.amount : Number(body.amount);
+          if (!amount || amount <= 0) amount = Number(job.price);
+          if (!amount || amount <= 0) return sendJson(res, 400, { error: "invalid_input", message: "Вкажіть суму рахунку." });
+          const invoice = await createInvoiceForJob(job, amount, req.user.id);
+          sendJson(res, 201, invoice);
     });
 };
