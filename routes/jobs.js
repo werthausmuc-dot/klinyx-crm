@@ -38,6 +38,11 @@ function addMonthsClamped(dateStr, months) {
     const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
     return targetYear + "-" + pad2(targetMonth + 1) + "-" + pad2(Math.min(p[2], lastDay));
 }
+function endOfMonth(dateStr) {
+    const p = dateStr.split("-").map(Number);
+    const lastDay = new Date(Date.UTC(p[0], p[1], 0)).getUTCDate(); // day 0 of next month
+    return p[0] + "-" + pad2(p[1]) + "-" + pad2(lastDay);
+}
 function stepDate(dateStr, freq) {
     if (freq === "weekly") return addDays(dateStr, 7);
     if (freq === "biweekly") return addDays(dateStr, 14);
@@ -104,12 +109,16 @@ function invoiceNoteForJob(job) {
 }
 
 async function createInvoiceForJob(job, amount, createdBy) {
-  const today = fmtDateUTC(new Date());
+  // Issued the day the job itself happened, due at the end of that same
+  // month — not "today" (when someone happened to mark it done or click
+  // the quick-invoice button), which could be days or weeks later.
+  const issueDate = DATE_RE.test(job.date) ? job.date : fmtDateUTC(new Date());
+  const dueDate = endOfMonth(issueDate);
   return store.create("invoices", {
     clientId: job.clientId,
     amount,
-    issueDate: today,
-    dueDate: today,
+    issueDate,
+    dueDate,
     status: "unpaid",
     note: invoiceNoteForJob(job),
     jobId: job.id,
