@@ -142,6 +142,7 @@
     "Вкажіть дату": "Bitte Datum angeben",
     "Завдання оновлено": "Auftrag aktualisiert", "Завдання заплановано": "Auftrag geplant",
     "Завдання виконано — рахунок додано до неоплачених": "Auftrag erledigt — Rechnung zu den unbezahlten hinzugefügt",
+    "рахунок виставлено": "Rechnung ausgestellt", "рахунок не виставлено": "Rechnung nicht ausgestellt",
     "Видалити це завдання?": "Diesen Auftrag löschen?", "Завдання видалено": "Auftrag gelöscht",
     "Редагувати рахунок": "Rechnung bearbeiten", "Новий рахунок": "Neue Rechnung",
     "Сума, € *": "Betrag, € *", "Дата виставлення": "Ausstellungsdatum",
@@ -418,6 +419,7 @@
       "Завдання оновлено": "تم تحديث المهمة",
       "Завдання заплановано": "تمت جدولة المهمة",
       "Завдання виконано — рахунок додано до неоплачених": "تم إنجاز المهمة — تمت إضافة فاتورة إلى غير المدفوعة",
+      "рахунок виставлено": "تم إصدار الفاتورة", "рахунок не виставлено": "لم تُصدر الفاتورة",
       "Видалити це завдання?": "حذف هذه المهمة؟",
       "Завдання видалено": "تم حذف المهمة",
       "Редагувати рахунок": "تعديل الفاتورة",
@@ -997,6 +999,7 @@
     return Array.from(state.jobs.values()).slice().sort(function (a, b) { return (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")); });
   }
   function invoicesList() { return Array.from(state.invoices.values()); }
+  function invoiceForJob(jobId) { return invoicesList().find(function (i) { return i.jobId === jobId; }) || null; }
   function inventoryList() { return Array.from(state.inventory.values()); }
   function roadmapList() { return Array.from(state.roadmap.values()); }
   function platformsList() { return Array.from(state.platforms.values()); }
@@ -1096,8 +1099,11 @@
       var dayJobs = jobsByDate[dateStr] || [];
       var dots = dayJobs.slice(0, 4).map(function (j) {
         var dotTitle = clientName(j.clientId) + (j.service ? " — " + t(j.service) : "") + " · " + statusLabelJob(j.status) +
-          (j.status === "cancelled" && j.cancelReason ? " (" + j.cancelReason + ")" : "");
-        return '<span class="cal-dot ' + (j.status === "done" ? "done" : j.status === "cancelled" ? "cancelled" : "") + '" title="' + escapeHtml(dotTitle) + '"></span>';
+          (j.status === "cancelled" && j.cancelReason ? " (" + j.cancelReason + ")" : "") +
+          (j.status === "done" ? " · " + (invoiceForJob(j.id) ? t("рахунок виставлено") : t("рахунок не виставлено")) : "");
+        var dotCls = j.status === "done" ? "done" : j.status === "cancelled" ? "cancelled" : "";
+        if (j.status === "done" && !invoiceForJob(j.id)) dotCls += " no-invoice";
+        return '<span class="cal-dot ' + dotCls + '" title="' + escapeHtml(dotTitle) + '"></span>';
       }).join("");
       var more = dayJobs.length > 4 ? '<span class="cal-more">+' + (dayJobs.length - 4) + '</span>' : "";
 
@@ -1340,6 +1346,7 @@
         '<div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">' +
           '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span>' +
           '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? t("оплачено") : t("не оплачено")) + '</span>' +
+          (j.status === "done" ? '<span class="pill ' + (invoiceForJob(j.id) ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (invoiceForJob(j.id) ? t("рахунок виставлено") : t("рахунок не виставлено")) + '</span>' : '') +
           (j.status === "scheduled" ? '<button class="btn btn-sm btn-ghost" data-decline-job="' + j.id + '">' + t("Відмовити") + '</button>' : '') +
         '</div></div>';
     }).join("");
@@ -2136,6 +2143,7 @@
                 '<div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">' +
                   '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span>' +
                   '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? t("оплачено") : t("не оплачено")) + '</span>' +
+                  (j.status === "done" ? '<span class="pill ' + (invoiceForJob(j.id) ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (invoiceForJob(j.id) ? t("рахунок виставлено") : t("рахунок не виставлено")) + '</span>' : '') +
                 '</div></div>';
             }).join("") : '<div class="empty-note">' + t("Ще немає завдань") + '</div>') + '</div>' +
           '<div class="drawer-section"><h4 style="display:flex; justify-content:space-between; align-items:center;">' + t("Рахунки") + ' <button class="btn btn-sm" id="dr-add-invoice">' + t("+ Додати") + '</button></h4>' +
