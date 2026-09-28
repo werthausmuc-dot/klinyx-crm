@@ -119,12 +119,14 @@ async function createInvoiceForJob(job, amount, createdBy) {
 
 // Called right after a job is created/updated. Only fires when the job
 // actually has a positive price (an invoice for €0 would just get
-// rejected by the invoices API anyway) and no invoice already references
-// it — that second check is what makes this safe to call on every single
-// save of an already-done job, not just the moment it first becomes done.
+// rejected by the invoices API anyway), no invoice already references it
+// (that second check is what makes this safe to call on every single save
+// of an already-done job, not just the moment it first becomes done), and
+// the job isn't flagged noAutoInvoice — see the DELETE /api/invoices/:id
+// route for why that flag exists.
 // Returns the created invoice, or null if nothing was created.
 async function maybeAutoInvoiceForDoneJob(job) {
-  if (!job || job.status !== "done") return null;
+  if (!job || job.status !== "done" || job.noAutoInvoice) return null;
   const price = Number(job.price);
   if (!price || price <= 0) return null;
   const invoices = await store.list("invoices");
@@ -137,9 +139,11 @@ async function maybeAutoInvoiceForDoneJob(job) {
 // plan). Covers jobs that were marked "done" before this feature existed,
 // or through any path that doesn't go through the PATCH handler below, so
 // they don't sit forever showing "рахунок не виставлено" until somebody
-// happens to re-save them.
+// happens to re-save them. Skips jobs flagged noAutoInvoice — otherwise
+// deleting an auto-created invoice would just have this catch-up silently
+// recreate it the moment the page reloads the job list.
 async function ensureInvoicesForDoneJobs(jobs) {
-  const candidates = jobs.filter((j) => j.status === "done" && Number(j.price) > 0);
+  const candidates = jobs.filter((j) => j.status === "done" && !j.noAutoInvoice && Number(j.price) > 0);
   if (!candidates.length) return;
   const invoices = await store.list("invoices");
   const invoiced = new Set(invoices.map((i) => i.jobId).filter(Boolean));
@@ -271,6 +275,10 @@ module.exports = function registerJobRoutes(router) {
           if (!amount || amount <= 0) amount = Number(job.price);
           if (!amount || amount <= 0) return sendJson(res, 400, { error: "invalid_input", message: "Вкажіть суму рахунку." });
           const invoice = await createInvoiceForJob(job, amount, req.user.id);
+          // An explicit "issue it now" click overrides any earlier deletion
+          // of this job's invoice, so the automatic flow can pick it back up
+          // normally if this one is ever deleted too.
+          if (job.noAutoInvoice) await store.update("jobs", job.id, { noAutoInvoice: false });
           sendJson(res, 201, invoice);
     });
 };

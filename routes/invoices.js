@@ -52,6 +52,17 @@ module.exports = function registerInvoiceRoutes(router) {
     if (!requireAuth(req, res)) return;
     const existing = await store.get("invoices", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
+    // If this invoice was raised for a job (auto or via the quick-invoice
+    // button), deleting it needs to stick: jobs.js re-checks every done job
+    // for a missing invoice on every save and on every GET /api/jobs (so
+    // pre-existing done jobs get backfilled). Without this flag, deleting
+    // an auto-created invoice would just have it silently recreated the
+    // moment the page's next loadAll() fires. The flag clears itself the
+    // next time someone deliberately issues a new invoice for this job.
+    if (existing.jobId) {
+      const job = await store.get("jobs", existing.jobId);
+      if (job) await store.update("jobs", job.id, { noAutoInvoice: true });
+    }
     await store.remove("invoices", params.id);
     sendJson(res, 200, { ok: true });
   });
