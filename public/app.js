@@ -235,7 +235,19 @@
     " — хто вихідний": " — wer frei hat",
     "Цього дня ніхто не позначив себе вихідним.": "An diesem Tag hat sich niemand als frei markiert.",
     "Вихідний": "Frei",
-    "У виконавця цього дня вихідний.": "Der Mitarbeiter hat an diesem Tag frei."
+    "У виконавця цього дня вихідний.": "Der Mitarbeiter hat an diesem Tag frei.",
+    "Вихідний за годинами (необов'язково)": "Freizeit nach Stunden (optional)",
+    "до": "bis",
+    "Прибрати": "Entfernen",
+    "Відпрацьовано годин цього дня": "An diesem Tag geleistete Stunden",
+    "Відпрацьовано цього дня": "An diesem Tag geleistet",
+    "год.": "Std.",
+    "г": "Std",
+    "Відпрацьовано за місяць: ": "Geleistet in diesem Monat: ",
+    "Вкажіть і початок, і завершення": "Geben Sie sowohl Anfang als auch Ende an",
+    "Вкажіть час початку і завершення": "Geben Sie Anfangs- und Endzeit an",
+    "Збережено": "Gespeichert",
+    "Вкажіть коректну кількість годин": "Geben Sie eine gültige Stundenzahl an"
   };
   var I18N = {
     de: I18N_DE,
@@ -568,7 +580,19 @@
       " — хто вихідний": " — من في إجازة",
       "Цього дня ніхто не позначив себе вихідним.": "لم يحدد أحد نفسه في إجازة هذا اليوم.",
       "Вихідний": "إجازة",
-      "У виконавця цього дня вихідний.": "الموظف المكلف في إجازة هذا اليوم."
+      "У виконавця цього дня вихідний.": "الموظف المكلف في إجازة هذا اليوم.",
+      "Вихідний за годинами (необов'язково)": "إجازة بالساعات (اختياري)",
+      "до": "إلى",
+      "Прибрати": "إزالة",
+      "Відпрацьовано годин цього дня": "الساعات المعمولة هذا اليوم",
+      "Відпрацьовано цього дня": "تم العمل هذا اليوم",
+      "год.": "ساعة",
+      "г": "س",
+      "Відпрацьовано за місяць: ": "تم العمل هذا الشهر: ",
+      "Вкажіть і початок, і завершення": "حدد وقت البداية والنهاية",
+      "Вкажіть час початку і завершення": "حدد وقت البدء والانتهاء",
+      "Збережено": "تم الحفظ",
+      "Вкажіть коректну кількість годин": "أدخل عدد ساعات صحيح"
     }
   };
   function t(s) {
@@ -693,6 +717,7 @@
     platforms: new Map(),
     dayPlans: new Map(),
     timeoff: new Map(),
+    workhours: new Map(),
     users: [],
     roster: [],
     telegram: null,
@@ -967,7 +992,8 @@
       api("GET", "/api/roadmap"),
       api("GET", "/api/platforms"),
       state.me && state.me.role === "admin" ? api("GET", "/api/dayplans") : Promise.resolve(null),
-      api("GET", "/api/timeoff")
+      api("GET", "/api/timeoff"),
+      api("GET", "/api/workhours")
     ]).then(function (res) {
       state.clients = new Map(res[0].map(function (c) { return [c.id, c]; }));
       state.jobs = new Map(res[1].map(function (j) { return [j.id, j]; }));
@@ -979,6 +1005,7 @@
       state.platforms = new Map((res[7] || []).map(function (p) { return [p.id, p]; }));
       if (res[8]) state.dayPlans = new Map(res[8].map(function (d) { return [d.id, d]; }));
       state.timeoff = new Map((res[9] || []).map(function (o) { return [o.id, o]; }));
+      state.workhours = new Map((res[10] || []).map(function (w) { return [w.id, w]; }));
       render();
     }).catch(function (err) {
       if (err && err.code !== "not_authenticated") toast(err.message || t("Не вдалося оновити дані"), true);
@@ -1148,20 +1175,37 @@
 
   /* ============ days off ============ */
   // A worker's own simple availability calendar: one record per (userId,
-  // date) means that person is off that day. Admins get a dropdown to view
-  // and edit anyone's calendar (e.g. to enter approved leave for them);
-  // everyone else only ever sees and edits their own. The "who's off"
-  // panel below the calendar always looks at everyone's records for the
-  // selected day, regardless of whose calendar is currently open, so an
-  // admin picking a job date can see the whole team's availability at once.
+  // date) means that person is off that day, optionally narrowed with a
+  // `from`/`to` time range for a partial day off. Admins get a dropdown to
+  // view and edit anyone's calendar (e.g. to enter approved leave for
+  // them); everyone else only ever sees and edits their own. The "who's
+  // off" panel below the calendar always looks at everyone's records for
+  // the selected day, regardless of whose calendar is currently open, so
+  // an admin picking a job date can see the whole team's availability at
+  // once.
+  //
+  // Worked hours ("відпрацьований час") are a separate, parallel
+  // per-(userId, date) log of hours actually worked that day — unrelated
+  // to whether the day is marked off, e.g. for a quick manual timesheet.
   function timeoffList() { return Array.from(state.timeoff.values()); }
-  function isOffDay(userId, date) {
-    return timeoffList().some(function (o) { return o.userId === userId && o.date === date; });
+  function offRecordFor(userId, date) {
+    return timeoffList().find(function (o) { return o.userId === userId && o.date === date; }) || null;
   }
+  function isOffDay(userId, date) { return !!offRecordFor(userId, date); }
   function timeoffCurrentWorkerId() {
     if (state.me.role !== "admin") return state.me.id;
     if (state.timeoffWorkerId && state.roster.some(function (u) { return u.id === state.timeoffWorkerId; })) return state.timeoffWorkerId;
     return (state.roster[0] && state.roster[0].id) || state.me.id;
+  }
+
+  function workhoursList() { return Array.from(state.workhours.values()); }
+  function workhoursFor(userId, date) {
+    var rec = workhoursList().find(function (w) { return w.userId === userId && w.date === date; });
+    return rec ? rec.hours : null;
+  }
+  function fmtHours(n) {
+    var r = Math.round(n * 100) / 100;
+    return r % 1 === 0 ? String(r) : String(r).replace(".", ",");
   }
 
   function renderTimeoff() {
@@ -1181,6 +1225,8 @@
     if (!state.timeoffSelectedDay) state.timeoffSelectedDay = todayStr();
     renderTimeoffCalendar();
     renderTimeoffDayList();
+    renderTimeoffHoursForm();
+    renderTimeoffMonthSummary();
   }
 
   function renderTimeoffCalendar() {
@@ -1208,9 +1254,15 @@
       if (cellMonth > 11) { cellMonth = 0; cellYear++; }
       var dateStr = cellYear + "-" + pad2(cellMonth + 1) + "-" + pad2(dayNum);
 
+      var offRec = offRecordFor(workerId, dateStr);
+      var worked = workhoursFor(workerId, dateStr);
       var cls = "cal-cell" + (muted ? " muted" : "") + (dateStr === todayS ? " today" : "") +
-        (dateStr === state.timeoffSelectedDay ? " selected" : "") + (isOffDay(workerId, dateStr) ? " off" : "");
-      cells.push('<div class="' + cls + '" data-date="' + dateStr + '"><div class="cal-daynum">' + dayNum + '</div></div>');
+        (dateStr === state.timeoffSelectedDay ? " selected" : "") +
+        (offRec ? (offRec.from && offRec.to ? " off off-partial" : " off") : "");
+      var hint = "";
+      if (offRec && offRec.from && offRec.to) hint = '<div class="cal-hint off-hours">' + offRec.from + '–' + offRec.to + '</div>';
+      else if (worked) hint = '<div class="cal-hint worked">' + fmtHours(worked) + t("г") + '</div>';
+      cells.push('<div class="' + cls + '" data-date="' + dateStr + '"><div class="cal-daynum">' + dayNum + '</div>' + hint + '</div>');
     }
     document.getElementById("timeoff-cal-grid").innerHTML = cells.join("");
 
@@ -1224,14 +1276,48 @@
     document.getElementById("timeoff-day-title").textContent = fmtDateHuman(day) + t(" — хто вихідний");
     var off = state.roster.filter(function (u) { return isOffDay(u.id, day); });
     var listEl = document.getElementById("timeoff-day-list");
+    var rows = [];
     if (!off.length) {
-      listEl.innerHTML = '<div class="empty-note">' + t("Цього дня ніхто не позначив себе вихідним.") + '</div>';
-      return;
+      rows.push('<div class="empty-note">' + t("Цього дня ніхто не позначив себе вихідним.") + '</div>');
+    } else {
+      rows = rows.concat(off.map(function (u) {
+        var rec = offRecordFor(u.id, day);
+        var label = rec && rec.from && rec.to ? t("Вихідний") + " " + rec.from + "–" + rec.to : t("Вихідний");
+        return '<div class="job-row"><div class="agenda-main"><div class="title">' + escapeHtml(u.name) + '</div></div>' +
+          '<span class="pill unpaid"><span class="pill-dot"></span>' + escapeHtml(label) + '</span></div>';
+      }));
     }
-    listEl.innerHTML = off.map(function (u) {
-      return '<div class="job-row"><div class="agenda-main"><div class="title">' + escapeHtml(u.name) + '</div></div>' +
-        '<span class="pill unpaid"><span class="pill-dot"></span>' + t("Вихідний") + '</span></div>';
-    }).join("");
+    var worked = state.roster
+      .map(function (u) { return { u: u, hours: workhoursFor(u.id, day) }; })
+      .filter(function (x) { return x.hours; });
+    if (worked.length) {
+      rows.push('<div class="panel-head" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border);"><h3 style="font-size:13px;">' + t("Відпрацьовано цього дня") + '</h3></div>');
+      rows = rows.concat(worked.map(function (x) {
+        return '<div class="job-row"><div class="agenda-main"><div class="title">' + escapeHtml(x.u.name) + '</div></div>' +
+          '<span class="pill done"><span class="pill-dot"></span>' + fmtHours(x.hours) + ' ' + t("год.") + '</span></div>';
+      }));
+    }
+    listEl.innerHTML = rows.join("");
+  }
+
+  function renderTimeoffHoursForm() {
+    var day = state.timeoffSelectedDay || todayStr();
+    var workerId = state.timeoffWorkerId;
+    var rec = offRecordFor(workerId, day);
+    document.getElementById("timeoff-hours-from").value = rec && rec.from ? rec.from : "";
+    document.getElementById("timeoff-hours-to").value = rec && rec.to ? rec.to : "";
+    var hours = workhoursFor(workerId, day);
+    document.getElementById("workhours-input").value = hours ? hours : "";
+  }
+
+  function renderTimeoffMonthSummary() {
+    var workerId = state.timeoffWorkerId;
+    var prefix = state.timeoffCalYear + "-" + pad2(state.timeoffCalMonth + 1);
+    var total = workhoursList()
+      .filter(function (w) { return w.userId === workerId && w.date.indexOf(prefix) === 0; })
+      .reduce(function (sum, w) { return sum + w.hours; }, 0);
+    document.getElementById("timeoff-month-summary").textContent =
+      t("Відпрацьовано за місяць: ") + fmtHours(total) + " " + t("год.");
   }
 
   function toggleTimeoffDay(dateStr) {
@@ -1245,6 +1331,54 @@
       }
       renderTimeoffCalendar();
       renderTimeoffDayList();
+      renderTimeoffHoursForm();
+    }).catch(function (err) { toast(err.message, true); });
+  }
+
+  function saveTimeoffHours() {
+    var workerId = state.timeoffWorkerId;
+    var day = state.timeoffSelectedDay || todayStr();
+    var from = document.getElementById("timeoff-hours-from").value;
+    var to = document.getElementById("timeoff-hours-to").value;
+    if ((from && !to) || (!from && to)) { toast(t("Вкажіть і початок, і завершення"), true); return; }
+    if (!from && !to) { toast(t("Вкажіть час початку і завершення"), true); return; }
+    api("POST", "/api/timeoff/hours", { date: day, userId: workerId, from: from, to: to }).then(function (res) {
+      if (res && res.id) state.timeoff.set(res.id, res);
+      renderTimeoffCalendar();
+      renderTimeoffDayList();
+      toast(t("Збережено"));
+    }).catch(function (err) { toast(err.message, true); });
+  }
+
+  function clearTimeoffHours() {
+    var workerId = state.timeoffWorkerId;
+    var day = state.timeoffSelectedDay || todayStr();
+    var rec = offRecordFor(workerId, day);
+    if (!rec) { renderTimeoffHoursForm(); return; }
+    api("DELETE", "/api/timeoff/" + rec.id).then(function () {
+      state.timeoff.delete(rec.id);
+      renderTimeoffCalendar();
+      renderTimeoffDayList();
+      renderTimeoffHoursForm();
+    }).catch(function (err) { toast(err.message, true); });
+  }
+
+  function saveWorkedHours() {
+    var workerId = state.timeoffWorkerId;
+    var day = state.timeoffSelectedDay || todayStr();
+    var val = document.getElementById("workhours-input").value;
+    var hours = val === "" ? 0 : Number(String(val).replace(",", "."));
+    if (Number.isNaN(hours) || hours < 0) { toast(t("Вкажіть коректну кількість годин"), true); return; }
+    api("POST", "/api/workhours/set", { date: day, userId: workerId, hours: hours }).then(function (res) {
+      if (res && res.removed) {
+        if (res.id) state.workhours.delete(res.id);
+      } else if (res && res.id) {
+        state.workhours.set(res.id, res);
+      }
+      renderTimeoffCalendar();
+      renderTimeoffDayList();
+      renderTimeoffMonthSummary();
+      toast(t("Збережено"));
     }).catch(function (err) { toast(err.message, true); });
   }
 
@@ -2696,16 +2830,21 @@
   document.getElementById("timeoff-cal-prev").addEventListener("click", function () {
     state.timeoffCalMonth--; if (state.timeoffCalMonth < 0) { state.timeoffCalMonth = 11; state.timeoffCalYear--; }
     renderTimeoffCalendar();
+    renderTimeoffMonthSummary();
   });
   document.getElementById("timeoff-cal-next").addEventListener("click", function () {
     state.timeoffCalMonth++; if (state.timeoffCalMonth > 11) { state.timeoffCalMonth = 0; state.timeoffCalYear++; }
     renderTimeoffCalendar();
+    renderTimeoffMonthSummary();
   });
   document.getElementById("timeoff-worker-select").addEventListener("change", function (e) {
     state.timeoffWorkerId = e.target.value;
     state.timeoffSelectedDay = null;
     renderTimeoff();
   });
+  document.getElementById("timeoff-hours-save").addEventListener("click", saveTimeoffHours);
+  document.getElementById("timeoff-hours-clear").addEventListener("click", clearTimeoffHours);
+  document.getElementById("workhours-save").addEventListener("click", saveWorkedHours);
 
   document.getElementById("client-search").addEventListener("input", function (e) { state.clientQuery = e.target.value; renderClients(); });
   document.querySelectorAll("#view-clients .filter-chip").forEach(function (chip) {

@@ -379,6 +379,26 @@
       <div class="panel" style="margin-top:16px;">
         <div class="panel-head"><h3 id="timeoff-day-title">—</h3></div>
         <div id="timeoff-day-list"></div>
+        <div class="field-row" style="margin-top:14px; align-items:flex-end;">
+          <div class="field">
+            <label data-i18n="Вихідний за годинами (необов'язково)">Вихідний за годинами (необов'язково)</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="time" id="timeoff-hours-from" style="max-width:110px;">
+              <span class="sub" data-i18n="до">до</span>
+              <input type="time" id="timeoff-hours-to" style="max-width:110px;">
+              <button class="btn btn-sm" id="timeoff-hours-save" data-i18n="Зберегти">Зберегти</button>
+              <button class="btn btn-sm btn-danger-text" id="timeoff-hours-clear" data-i18n="Прибрати">Прибрати</button>
+            </div>
+          </div>
+          <div class="field">
+            <label data-i18n="Відпрацьовано годин цього дня">Відпрацьовано годин цього дня</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="number" id="workhours-input" min="0" max="24" step="0.5" style="max-width:90px;">
+              <button class="btn btn-sm" id="workhours-save" data-i18n="Зберегти">Зберегти</button>
+            </div>
+          </div>
+        </div>
+        <p class="auth-sub" style="margin-top:10px;" id="timeoff-month-summary"></p>
       </div>
     </section>
 

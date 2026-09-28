@@ -198,6 +198,10 @@ main.content { flex: 1; min-width: 0; padding: 26px 34px 60px; max-width: 1280px
 .cal-cell.off { background: var(--warning-soft); border-color: var(--warning); }
 .cal-cell.off .cal-daynum { color: var(--warning); }
 .cal-cell.off.selected { box-shadow: inset 0 0 0 2px var(--accent); }
+.cal-cell.off-partial { background: linear-gradient(135deg, var(--warning-soft) 52%, var(--surface) 52%); }
+.cal-hint { font-size: 9px; font-family: "IBM Plex Mono", monospace; color: var(--text-faint); margin-top: auto; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-hint.off-hours { color: var(--warning); font-weight: 700; }
+.cal-hint.worked { color: var(--success); font-weight: 700; }
 .cal-daynum { font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .cal-cell.today .cal-daynum { color: var(--accent-strong); }
 .cal-dots { display: flex; flex-wrap: wrap; gap: 3px; margin-top: auto; }
