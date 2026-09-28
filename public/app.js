@@ -141,6 +141,7 @@
     "Наступні дати з'являться автоматично (наперед приблизно на 2 місяці). Про кожну згенеровану дату Telegram-сповіщення не надсилається — тільки про перше створене завдання.": "Die nächsten Termine erscheinen automatisch (ca. 2 Monate im Voraus). Für jeden automatisch erzeugten Termin wird keine Telegram-Benachrichtigung gesendet — nur für den zuerst erstellten Auftrag.",
     "Вкажіть дату": "Bitte Datum angeben",
     "Завдання оновлено": "Auftrag aktualisiert", "Завдання заплановано": "Auftrag geplant",
+    "Завдання виконано — рахунок додано до неоплачених": "Auftrag erledigt — Rechnung zu den unbezahlten hinzugefügt",
     "Видалити це завдання?": "Diesen Auftrag löschen?", "Завдання видалено": "Auftrag gelöscht",
     "Редагувати рахунок": "Rechnung bearbeiten", "Новий рахунок": "Neue Rechnung",
     "Сума, € *": "Betrag, € *", "Дата виставлення": "Ausstellungsdatum",
@@ -416,6 +417,7 @@
       "Вкажіть дату": "يرجى إدخال التاريخ",
       "Завдання оновлено": "تم تحديث المهمة",
       "Завдання заплановано": "تمت جدولة المهمة",
+      "Завдання виконано — рахунок додано до неоплачених": "تم إنجاز المهمة — تمت إضافة فاتورة إلى غير المدفوعة",
       "Видалити це завдання?": "حذف هذه المهمة؟",
       "Завдання видалено": "تم حذف المهمة",
       "Редагувати рахунок": "تعديل الفاتورة",
@@ -2236,7 +2238,13 @@
       var recurFreq = document.getElementById("f-recur-freq").value;
       data.recurrence = recurFreq ? { freq: recurFreq, until: document.getElementById("f-recur-until").value || null } : null;
       var req = id ? api("PATCH", "/api/jobs/" + id, data) : api("POST", "/api/jobs", data);
-      req.then(function () { toast(id ? t("Завдання оновлено") : t("Завдання заплановано")); closeOverlay(); loadAll(); })
+      req.then(function (res) {
+        var msg = id ? t("Завдання оновлено") : t("Завдання заплановано");
+        if (res && res.autoInvoiceCreated) msg = t("Завдання виконано — рахунок додано до неоплачених");
+        toast(msg);
+        closeOverlay();
+        loadAll();
+      })
          .catch(function (err) { toast(err.message, true); });
     });
     if (id) {
