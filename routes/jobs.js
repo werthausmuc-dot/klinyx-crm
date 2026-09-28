@@ -58,11 +58,16 @@ async function ensureRecurringInstances() {
         }
 
       const seriesDates = jobs.filter((j) => (j.seriesId || j.id) === seriesId).map((j) => j.date);
+        // Dates the user explicitly deleted a generated occurrence for — see
+        // the DELETE route below. Without this, deleting the most recent
+        // occurrence would just make it look like the "next" date to
+        // generate again, and it would reappear on the very next GET.
+        const excluded = Array.isArray(anchor.recurrence.excluded) ? anchor.recurrence.excluded : [];
         const lastDate = seriesDates.slice().sort().pop() || anchor.date;
         let nextDate = stepDate(lastDate, anchor.recurrence.freq);
 
       while (nextDate && nextDate <= horizon && (!anchor.recurrence.until || nextDate <= anchor.recurrence.until)) {
-              if (seriesDates.indexOf(nextDate) === -1) {
+              if (seriesDates.indexOf(nextDate) === -1 && excluded.indexOf(nextDate) === -1) {
                         const created = await store.create("jobs", {
                                     clientId: anchor.clientId,
                                     date: nextDate,
@@ -146,9 +151,16 @@ function clean(body, existing) {
     if (body.recurrence === null) {
           data.recurrence = null;
     } else if (body.recurrence && typeof body.recurrence === "object" && RECUR_FREQS.includes(body.recurrence.freq)) {
+          // The client only ever sends {freq, until} — it doesn't know about
+          // `excluded` (dates whose occurrence was individually deleted), so
+          // carry that list over from the existing record or it would be
+          // wiped out, and deleted occurrences would come back to life, on
+          // every single save of the anchor job.
+          const prevExcluded = existing && existing.recurrence && Array.isArray(existing.recurrence.excluded) ? existing.recurrence.excluded : [];
           data.recurrence = {
                   freq: body.recurrence.freq,
-                  until: typeof body.recurrence.until === "string" && DATE_RE.test(body.recurrence.until) ? body.recurrence.until : null
+                  until: typeof body.recurrence.until === "string" && DATE_RE.test(body.recurrence.until) ? body.recurrence.until : null,
+                  excluded: prevExcluded
           };
     }
     return data;
@@ -194,6 +206,23 @@ module.exports = function registerJobRoutes(router) {
           if (!requireAuth(req, res)) return;
           const existing = await store.get("jobs", params.id);
           if (!existing) return sendJson(res, 404, { error: "not_found" });
+          // Deleting one occurrence of a recurring series: if we don't record
+          // which date was removed, the lazy catch-up generator in
+          // ensureRecurringInstances() can mistake the now-later "last date"
+          // gap for one it still needs to fill, and silently recreate the
+          // very job that was just deleted. Deleting the anchor itself needs
+          // no such bookkeeping — with the anchor gone, nothing generates
+          // more occurrences for this series at all.
+          if (existing.seriesId && existing.seriesId !== existing.id) {
+                const anchor = await store.get("jobs", existing.seriesId);
+                if (anchor && anchor.recurrence) {
+                      const excluded = Array.isArray(anchor.recurrence.excluded) ? anchor.recurrence.excluded.slice() : [];
+                      if (excluded.indexOf(existing.date) === -1) {
+                            excluded.push(existing.date);
+                            await store.update("jobs", anchor.id, { recurrence: Object.assign({}, anchor.recurrence, { excluded }) });
+                      }
+                }
+          }
           await store.remove("jobs", params.id);
           sendJson(res, 200, { ok: true });
     });
