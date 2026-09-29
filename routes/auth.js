@@ -27,6 +27,7 @@ module.exports = function registerAuthRoutes(router) {
       name: String(name || username).trim(),
       role: "admin",
       active: true,
+      isOwner: true,
       telegramChatId: null,
       telegramLinkCode: generateTelegramLinkCode()
     });

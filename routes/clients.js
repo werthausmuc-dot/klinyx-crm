@@ -1,6 +1,18 @@
 const store = require("../lib/store");
-const { requireAuth } = require("../lib/auth");
+const { requireAuth, hasPermission } = require("../lib/auth");
 const { sendJson, readJsonBody } = require("../lib/http-utils");
+
+// Viewing the client list stays open to everyone authenticated (job
+// assignment needs it), but creating/editing/deleting a client's own data
+// now needs the owner-granted "editClients" permission.
+function requireClientEdit(req, res) {
+  if (!requireAuth(req, res)) return false;
+  if (!hasPermission(req.user, "editClients")) {
+    sendJson(res, 403, { error: "forbidden", message: "У вас немає дозволу змінювати дані клієнтів." });
+    return false;
+  }
+  return true;
+}
 
 const STATUSES = ["lead", "active", "inactive"];
 
@@ -23,7 +35,7 @@ module.exports = function registerClientRoutes(router) {
   });
 
   router.post("/api/clients", async (req, res) => {
-    if (!requireAuth(req, res)) return;
+    if (!requireClientEdit(req, res)) return;
     const body = await readJsonBody(req);
     const data = clean(body, null);
     if (!data.name) return sendJson(res, 400, { error: "invalid_input", message: "Вкажіть ім'я або назву клієнта." });
@@ -32,7 +44,7 @@ module.exports = function registerClientRoutes(router) {
   });
 
   router.patch("/api/clients/:id", async (req, res, params) => {
-    if (!requireAuth(req, res)) return;
+    if (!requireClientEdit(req, res)) return;
     const existing = await store.get("clients", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     const body = await readJsonBody(req);
@@ -42,7 +54,7 @@ module.exports = function registerClientRoutes(router) {
   });
 
   router.delete("/api/clients/:id", async (req, res, params) => {
-    if (!requireAuth(req, res)) return;
+    if (!requireClientEdit(req, res)) return;
     const existing = await store.get("clients", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     await store.remove("clients", params.id);

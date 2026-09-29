@@ -1,5 +1,5 @@
 const store = require("../lib/store");
-const { requireAuth } = require("../lib/auth");
+const { requireAuth, hasPermission } = require("../lib/auth");
 const { sendJson, readJsonBody } = require("../lib/http-utils");
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -8,18 +8,23 @@ const MAX_HOURS = 24;
 // A worker's actual worked time per day — separate from the "days off"
 // calendar. One record per (userId, date) holding the number of hours
 // worked that day (decimals allowed, e.g. 7.5). Manually entered by the
-// worker or an admin; there's no automatic clock-in/out yet.
+// worker or an admin; there's no automatic clock-in/out yet. Governed by
+// the same "editOthersSchedule" / "viewOthersSchedule" permissions as the
+// days-off calendar (see routes/timeoff.js) — it's the same "graphic" of
+// who's working when, just the worked-time side of it.
 function canEdit(req, userId) {
-  return userId === req.user.id || req.user.role === "admin";
+  return userId === req.user.id || hasPermission(req.user, "editOthersSchedule");
 }
 
 module.exports = function registerWorkhoursRoutes(router) {
-  // Everyone sees their own worked hours. Admins see everyone's, for payroll
-  // and planning purposes.
+  // Everyone sees their own worked hours. Whoever has the "view/edit
+  // others' schedule" permission sees everyone's, for payroll and
+  // planning purposes.
   router.get("/api/workhours", async (req, res) => {
     if (!requireAuth(req, res)) return;
     const all = await store.list("workhours");
-    const visible = req.user.role === "admin" ? all : all.filter((w) => w.userId === req.user.id);
+    const canViewOthers = hasPermission(req.user, "viewOthersSchedule") || hasPermission(req.user, "editOthersSchedule");
+    const visible = canViewOthers ? all : all.filter((w) => w.userId === req.user.id);
     sendJson(res, 200, visible);
   });
 

@@ -1,5 +1,5 @@
 const store = require("../lib/store");
-const { hashPassword, sanitizeUser, generateTelegramLinkCode, requireAuth, requireAdmin } = require("../lib/auth");
+const { hashPassword, sanitizeUser, generateTelegramLinkCode, requireAuth, requireAdmin, requireOwner, normalizePermissions, PERMISSION_KEYS } = require("../lib/auth");
 const { sendJson, readJsonBody } = require("../lib/http-utils");
 
 module.exports = function registerUserRoutes(router) {
@@ -13,7 +13,7 @@ module.exports = function registerUserRoutes(router) {
     const users = await store.list("users");
     const roster = users
       .filter((u) => u.active !== false)
-      .map((u) => ({ id: u.id, name: u.name, role: u.role, telegramLinked: !!u.telegramChatId }));
+      .map((u) => ({ id: u.id, name: u.name, role: u.role, isOwner: !!u.isOwner, telegramLinked: !!u.telegramChatId }));
     sendJson(res, 200, roster);
   });
 
@@ -53,7 +53,16 @@ module.exports = function registerUserRoutes(router) {
 
     const body = await readJsonBody(req);
     const patch = {};
-    const { name, role, active, password } = body || {};
+    const { name, role, active, password, permissions } = body || {};
+
+    // The owner's own role/active status is untouchable — by anyone,
+    // including the owner themself — so nobody can accidentally lock the
+    // business out of its own owner-only controls (permission management,
+    // the worker balance ledger, etc.).
+    if (existing.isOwner && (role !== undefined || active !== undefined)) {
+      return sendJson(res, 400, { error: "owner_protected", message: "Роль і статус власника акаунта змінити не можна." });
+    }
+
     if (typeof name === "string") patch.name = name.trim();
     if (role === "admin" || role === "employee") {
       if (existing.role === "admin" && role !== "admin") {
@@ -82,6 +91,21 @@ module.exports = function registerUserRoutes(router) {
       patch.passwordHash = hashPassword(String(password));
     }
 
+    // Only the owner grants/revokes the individual permissions below —
+    // not just any admin — and never for the owner's own record (the
+    // owner always implicitly has everything, see hasPermission).
+    if (permissions && typeof permissions === "object") {
+      if (!requireOwner(req, res)) return;
+      if (existing.isOwner) {
+        return sendJson(res, 400, { error: "owner_protected", message: "У власника й так є всі дозволи — окремо їх вмикати не потрібно." });
+      }
+      const invalidKeys = Object.keys(permissions).filter((k) => !PERMISSION_KEYS.includes(k));
+      if (invalidKeys.length) {
+        return sendJson(res, 400, { error: "invalid_input", message: "Невідомий дозвіл: " + invalidKeys.join(", ") });
+      }
+      patch.permissions = normalizePermissions(Object.assign({}, existing.permissions, permissions));
+    }
+
     const updated = await store.update("users", params.id, patch);
     sendJson(res, 200, sanitizeUser(updated));
   });
@@ -90,6 +114,9 @@ module.exports = function registerUserRoutes(router) {
     if (!requireAdmin(req, res)) return;
     const existing = await store.get("users", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
+    if (existing.isOwner) {
+      return sendJson(res, 400, { error: "owner_protected", message: "Обліковий запис власника видалити не можна." });
+    }
     if (existing.role === "admin") {
       const users = await store.list("users");
       const otherAdmins = users.filter((u) => u.role === "admin" && u.id !== existing.id);

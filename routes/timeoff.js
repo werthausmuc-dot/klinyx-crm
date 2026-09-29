@@ -1,27 +1,35 @@
 const store = require("../lib/store");
-const { requireAuth } = require("../lib/auth");
+const { requireAuth, hasPermission } = require("../lib/auth");
 const { sendJson, readJsonBody } = require("../lib/http-utils");
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // A worker's own simple "day off" calendar — just a set of dates they've
-// marked as unavailable, so an admin assigning jobs can see at a glance
+// marked as unavailable, so whoever's assigning jobs can see at a glance
 // whether the person they're about to assign is actually free that day.
 // One record per (userId, date) means that person is off that day. The
 // record can optionally carry a `from`/`to` time range for a partial day
 // off (e.g. off 13:00–17:00 for an appointment) — no range means the
 // whole day.
+//
+// Editing someone else's schedule needs the "editOthersSchedule"
+// permission (owner-granted, per user — see lib/auth.js); it's no longer
+// implied by the "admin" role alone.
 function canEdit(req, userId) {
-  return userId === req.user.id || req.user.role === "admin";
+  return userId === req.user.id || hasPermission(req.user, "editOthersSchedule");
+}
+function canViewOthers(req) {
+  return hasPermission(req.user, "viewOthersSchedule") || hasPermission(req.user, "editOthersSchedule");
 }
 module.exports = function registerTimeoffRoutes(router) {
-  // Everyone sees their own days off. Admins see everyone's, so they can
-  // plan job assignments around the whole team's availability.
+  // Everyone sees their own days off. Whoever has the "view others'
+  // schedule" (or "edit others' schedule") permission sees everyone's, so
+  // they can plan job assignments around the whole team's availability.
   router.get("/api/timeoff", async (req, res) => {
     if (!requireAuth(req, res)) return;
     const all = await store.list("timeoff");
-    const visible = req.user.role === "admin" ? all : all.filter((t) => t.userId === req.user.id);
+    const visible = canViewOthers(req) ? all : all.filter((t) => t.userId === req.user.id);
     sendJson(res, 200, visible);
   });
 
@@ -36,7 +44,7 @@ module.exports = function registerTimeoffRoutes(router) {
     if (!DATE_RE.test(date)) return sendJson(res, 400, { error: "invalid_input", message: "Некоректна дата." });
 
     let userId = typeof body.userId === "string" && body.userId ? body.userId : req.user.id;
-    if (userId !== req.user.id && req.user.role !== "admin") {
+    if (!canEdit(req, userId)) {
       return sendJson(res, 403, { error: "forbidden", message: "Ви можете редагувати лише свій графік." });
     }
     if (userId !== req.user.id) {
