@@ -6,7 +6,7 @@ loadEnv();
 
 const store = require("./lib/store");
 const { seedAutoPlatforms } = require("./lib/seed-platforms");
-const { sanitizeUser } = require("./lib/auth");
+const { sanitizeUser, ensureOwnerAssigned } = require("./lib/auth");
 const sessions = require("./lib/sessions");
 const { sendJson, serveStatic, parseCookies } = require("./lib/http-utils");
 const { getSessionIdFromRequest } = require("./lib/session-cookie");
@@ -28,8 +28,13 @@ require("./routes/platforms")(router);
 require("./routes/dayplans")(router);
 require("./routes/timeoff")(router);
 require("./routes/workhours")(router);
+require("./routes/balances")(router);
 
 async function getCurrentUser(req) {
+  // Lazy catch-up (same pattern as the recurring-jobs / auto-invoice logic
+  // in routes/jobs.js): cheap no-op after the first successful check, see
+  // ensureOwnerAssigned in lib/auth.js.
+  await ensureOwnerAssigned();
   const sid = getSessionIdFromRequest(req, parseCookies);
   if (!sid) return null;
   const session = sessions.getSession(sid);
