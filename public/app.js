@@ -247,7 +247,31 @@
     "Вкажіть і початок, і завершення": "Geben Sie sowohl Anfang als auch Ende an",
     "Вкажіть час початку і завершення": "Geben Sie Anfangs- und Endzeit an",
     "Збережено": "Gespeichert",
-    "Вкажіть коректну кількість годин": "Geben Sie eine gültige Stundenzahl an"
+    "Вкажіть коректну кількість годин": "Geben Sie eine gültige Stundenzahl an",
+    "Кількість замовлень": "Anzahl Aufträge",
+    "Баланс": "Saldo",
+    "Власник": "Inhaber",
+    "власник": "Inhaber",
+    "Дозволи": "Berechtigungen",
+    "Дозволи: ": "Berechtigungen: ",
+    "Редагування графіку вихідних інших співробітників": "Bearbeiten des Freizeitplans anderer Mitarbeiter",
+    "Перегляд вихідних інших співробітників": "Freie Tage anderer Mitarbeiter einsehen",
+    "Перегляд балансу інших співробітників": "Saldo anderer Mitarbeiter einsehen",
+    "Перегляд загального заробітку": "Gesamteinkommen einsehen",
+    "Зміна даних клієнта": "Kundendaten ändern",
+    "Дашборд: кількість клієнтів": "Dashboard: Anzahl Kunden",
+    "Дашборд: кількість замовлень": "Dashboard: Anzahl Aufträge",
+    "Дашборд: заборгованість (неоплачено)": "Dashboard: Außenstände (unbezahlt)",
+    "Дашборд: баланс": "Dashboard: Saldo",
+    "Дозволи оновлено": "Berechtigungen aktualisiert",
+    "Баланс: ": "Saldo: ",
+    "Поточний баланс": "Aktueller Saldo",
+    "Сума (+ нараховано, − виплачено)": "Betrag (+ zugerechnet, − ausgezahlt)",
+    "Примітка": "Notiz",
+    "напр. за тиждень": "z.B. für die Woche",
+    "Додати запис": "Eintrag hinzufügen",
+    "Запис додано": "Eintrag hinzugefügt",
+    "Закрити": "Schließen"
   };
   var I18N = {
     de: I18N_DE,
@@ -592,7 +616,31 @@
       "Вкажіть і початок, і завершення": "حدد وقت البداية والنهاية",
       "Вкажіть час початку і завершення": "حدد وقت البدء والانتهاء",
       "Збережено": "تم الحفظ",
-      "Вкажіть коректну кількість годин": "أدخل عدد ساعات صحيح"
+      "Вкажіть коректну кількість годин": "أدخل عدد ساعات صحيح",
+      "Кількість замовлень": "عدد الطلبات",
+      "Баланс": "الرصيد",
+      "Власник": "المالك",
+      "власник": "المالك",
+      "Дозволи": "الصلاحيات",
+      "Дозволи: ": "الصلاحيات: ",
+      "Редагування графіку вихідних інших співробітників": "تعديل جدول الإجازات للموظفين الآخرين",
+      "Перегляд вихідних інших співробітників": "عرض إجازات الموظفين الآخرين",
+      "Перегляд балансу інших співробітників": "عرض رصيد الموظفين الآخرين",
+      "Перегляд загального заробітку": "عرض إجمالي الدخل",
+      "Зміна даних клієнта": "تعديل بيانات العميل",
+      "Дашборд: кількість клієнтів": "لوحة التحكم: عدد العملاء",
+      "Дашборд: кількість замовлень": "لوحة التحكم: عدد الطلبات",
+      "Дашборд: заборгованість (неоплачено)": "لوحة التحكم: المستحقات (غير مدفوعة)",
+      "Дашборд: баланс": "لوحة التحكم: الرصيد",
+      "Дозволи оновлено": "تم تحديث الصلاحيات",
+      "Баланс: ": "الرصيد: ",
+      "Поточний баланс": "الرصيد الحالي",
+      "Сума (+ нараховано, − виплачено)": "المبلغ (+ مستحق، − مدفوع)",
+      "Примітка": "ملاحظة",
+      "напр. за тиждень": "مثال: عن الأسبوع",
+      "Додати запис": "إضافة سجل",
+      "Запис додано": "تمت إضافة السجل",
+      "Закрити": "إغلاق"
     }
   };
   function t(s) {
@@ -718,6 +766,7 @@
     dayPlans: new Map(),
     timeoff: new Map(),
     workhours: new Map(),
+    balances: new Map(),
     users: [],
     roster: [],
     telegram: null,
@@ -737,6 +786,12 @@
   };
 
   function todayStr() { return fmtDate(new Date()); }
+
+  // Mirrors lib/auth.js's hasPermission: the owner always has everything,
+  // everyone else needs the specific key explicitly granted by the owner.
+  function hasPerm(key) {
+    return !!(state.me && (state.me.isOwner || (state.me.permissions && state.me.permissions[key] === true)));
+  }
   function pad2(n) { return n < 10 ? "0" + n : "" + n; }
   function fmtDate(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
   function parseDate(s) { var p = s.split("-"); return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)); }
@@ -851,15 +906,23 @@
     state.me = null;
   }
 
-  function enterApp(user) {
+  // Applies a (fresh) /api/auth/me user to both state and the bits of
+  // chrome that depend on role/permissions — called at login, and again on
+  // every loadAll() poll so a permission grant from the owner takes effect
+  // for someone already using the app without them needing to log out.
+  function applyMe(user) {
     state.me = user;
-    hideAllScreens();
-    document.getElementById("app").hidden = false;
     document.getElementById("me-name").textContent = user.name || user.username;
-    document.getElementById("me-role").textContent = user.role === "admin" ? t("Адміністратор") : t("Співробітник");
+    document.getElementById("me-role").textContent = user.isOwner ? t("Власник") : user.role === "admin" ? t("Адміністратор") : t("Співробітник");
     document.getElementById("me-avatar").textContent = (user.name || user.username).trim().slice(0, 1).toUpperCase();
     document.getElementById("nav-team").hidden = user.role !== "admin";
     document.getElementById("nav-inventory").hidden = user.role !== "admin";
+  }
+
+  function enterApp(user) {
+    hideAllScreens();
+    document.getElementById("app").hidden = false;
+    applyMe(user);
     setView("dashboard");
     loadAll();
     refreshTelegramBadge();
@@ -993,7 +1056,9 @@
       api("GET", "/api/platforms"),
       state.me && state.me.role === "admin" ? api("GET", "/api/dayplans") : Promise.resolve(null),
       api("GET", "/api/timeoff"),
-      api("GET", "/api/workhours")
+      api("GET", "/api/workhours"),
+      api("GET", "/api/balances"),
+      api("GET", "/api/auth/me")
     ]).then(function (res) {
       state.clients = new Map(res[0].map(function (c) { return [c.id, c]; }));
       state.jobs = new Map(res[1].map(function (j) { return [j.id, j]; }));
@@ -1006,6 +1071,12 @@
       if (res[8]) state.dayPlans = new Map(res[8].map(function (d) { return [d.id, d]; }));
       state.timeoff = new Map((res[9] || []).map(function (o) { return [o.id, o]; }));
       state.workhours = new Map((res[10] || []).map(function (w) { return [w.id, w]; }));
+      state.balances = new Map((res[11] || []).map(function (b) { return [b.id, b]; }));
+      // Re-sync who "we" are on every poll, not just at login: the owner
+      // can grant/revoke permissions for someone who's already using the
+      // app, and this is what makes that take effect without them having
+      // to log out and back in.
+      if (res[12] && res[12].user) applyMe(res[12].user);
       render();
     }).catch(function (err) {
       if (err && err.code !== "not_authenticated") toast(err.message || t("Не вдалося оновити дані"), true);
@@ -1090,9 +1161,28 @@
     var unpaidSum = invoicesList().filter(function (i) { return i.status === "unpaid"; }).reduce(function (s, i) { return s + (Number(i.amount) || 0); }, 0);
 
     document.getElementById("stat-clients").textContent = state.clients.size;
+    document.getElementById("stat-orders-count").textContent = jobs.length;
     document.getElementById("stat-week-jobs").textContent = weekJobs.length;
     document.getElementById("stat-today").textContent = todayJobs.length;
     document.getElementById("stat-unpaid").textContent = fmtMoney(unpaidSum);
+    document.getElementById("stat-balance").textContent = fmtMoney(balanceTotalAll());
+
+    // These tiles/panels show figures the owner may not want every admin
+    // or employee to see by default — hidden unless the owner granted the
+    // matching permission (owner themself always sees everything).
+    var tileGate = {
+      "stat-tile-clients": "showClientsCount",
+      "stat-tile-orders-count": "showOrdersCount",
+      "stat-tile-unpaid": "showDebt",
+      "stat-tile-month-income": "viewEarnings",
+      "stat-tile-balance": "showBalance"
+    };
+    Object.keys(tileGate).forEach(function (elId) {
+      var el = document.getElementById(elId);
+      if (el) el.hidden = !hasPerm(tileGate[elId]);
+    });
+    var financePanel = document.getElementById("panel-finance");
+    if (financePanel) financePanel.hidden = !hasPerm("viewEarnings");
 
     var wr = weekRange(today), mr = monthRange(today);
     var weekJobsF = jobs.filter(function (j) { return j.status !== "cancelled" && j.date >= wr.start && j.date <= wr.end; });
@@ -1192,8 +1282,9 @@
     return timeoffList().find(function (o) { return o.userId === userId && o.date === date; }) || null;
   }
   function isOffDay(userId, date) { return !!offRecordFor(userId, date); }
+  function canBrowseOthersSchedule() { return hasPerm("viewOthersSchedule") || hasPerm("editOthersSchedule"); }
   function timeoffCurrentWorkerId() {
-    if (state.me.role !== "admin") return state.me.id;
+    if (!canBrowseOthersSchedule()) return state.me.id;
     if (state.timeoffWorkerId && state.roster.some(function (u) { return u.id === state.timeoffWorkerId; })) return state.timeoffWorkerId;
     return (state.roster[0] && state.roster[0].id) || state.me.id;
   }
@@ -1208,10 +1299,28 @@
     return r % 1 === 0 ? String(r) : String(r).replace(".", ",");
   }
 
+  /* ============ worker balance ("баланс") ============ */
+  // What the company currently owes a given worker: a simple ledger of
+  // entries (positive = accrued/owed, negative = paid out), added only by
+  // the owner (see routes/balances.js) — the running balance is just the
+  // sum. Who can see whose entries is governed by the "viewOthersBalance"
+  // permission; each person always sees their own.
+  function balancesList() { return Array.from(state.balances.values()); }
+  function balanceEntriesFor(userId) {
+    return balancesList().filter(function (b) { return b.userId === userId; })
+      .sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+  }
+  function balanceTotalFor(userId) {
+    return balanceEntriesFor(userId).reduce(function (s, b) { return s + (Number(b.amount) || 0); }, 0);
+  }
+  function balanceTotalAll() {
+    return balancesList().reduce(function (s, b) { return s + (Number(b.amount) || 0); }, 0);
+  }
+
   function renderTimeoff() {
     state.timeoffWorkerId = timeoffCurrentWorkerId();
     var pickerWrap = document.getElementById("timeoff-worker-picker-wrap");
-    if (state.me.role === "admin") {
+    if (canBrowseOthersSchedule()) {
       pickerWrap.hidden = false;
       var sel = document.getElementById("timeoff-worker-select");
       sel.innerHTML = state.roster.map(function (u) {
@@ -1710,19 +1819,43 @@
   function renderTeam() {
     if (!state.me || state.me.role !== "admin") return;
     var tbody = document.getElementById("users-tbody");
+    var canSeeBalance = hasPerm("viewOthersBalance");
+    var thBalance = document.getElementById("th-balance");
+    if (thBalance) thBalance.hidden = !canSeeBalance;
+
     tbody.innerHTML = state.users.map(function (u) {
+      var roleCell = u.isOwner
+        ? '<span class="pill admin"><span class="pill-dot"></span>' + t("власник") + '</span>'
+        : '<span class="pill ' + u.role + '"><span class="pill-dot"></span>' + (u.role === "admin" ? t("адмін") : t("співробітник")) + '</span>';
+
+      var actions = '<button class="btn btn-sm" data-reset-pw="' + u.id + '">' + t("Скинути пароль") + '</button>';
+      if (!u.isOwner) {
+        actions +=
+          '<button class="btn btn-sm btn-ghost" data-toggle-role="' + u.id + '">' + (u.role === "admin" ? t("Прибрати адміна") : t("Зробити адміном")) + '</button>' +
+          '<button class="btn btn-sm btn-ghost" data-toggle-active="' + u.id + '">' + (u.active ? t("Вимкнути") : t("Увімкнути")) + '</button>';
+        if (state.me.isOwner) {
+          actions += '<button class="btn btn-sm btn-ghost" data-open-perms="' + u.id + '">' + t("Дозволи") + '</button>';
+        }
+        if (u.id !== state.me.id) {
+          actions += '<button class="icon-btn" data-del-user="' + u.id + '" title="' + t("Видалити") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button>';
+        }
+      }
+
+      var balanceCell = "";
+      if (canSeeBalance) {
+        balanceCell = '<td class="mono">' + fmtMoney(balanceTotalFor(u.id)) +
+          (state.me.isOwner && !u.isOwner ? ' <button class="icon-btn" data-open-balance="' + u.id + '" title="' + t("Баланс") + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg></button>' : "") +
+          '</td>';
+      }
+
       return '<tr>' +
         '<td class="cell-title">' + escapeHtml(u.name) + (u.id === state.me.id ? ' <span class="cell-sub">' + t("(ви)") + '</span>' : '') + '</td>' +
         '<td class="mono">' + escapeHtml(u.username) + '</td>' +
-        '<td><span class="pill ' + u.role + '"><span class="pill-dot"></span>' + (u.role === "admin" ? t("адмін") : t("співробітник")) + '</span></td>' +
+        '<td>' + roleCell + '</td>' +
         '<td><span class="pill ' + (u.active ? "active" : "inactive") + '"><span class="pill-dot"></span>' + (u.active ? t("активний") : t("вимкнено")) + '</span></td>' +
         '<td>' + (u.telegramLinked ? '<span class="pill active"><span class="pill-dot"></span>' + t("підключено") + '</span>' : '<span class="pill lead"><span class="pill-dot"></span>—</span>') + '</td>' +
-        '<td><div class="row-actions">' +
-          '<button class="btn btn-sm" data-reset-pw="' + u.id + '">' + t("Скинути пароль") + '</button>' +
-          '<button class="btn btn-sm btn-ghost" data-toggle-role="' + u.id + '">' + (u.role === "admin" ? t("Прибрати адміна") : t("Зробити адміном")) + '</button>' +
-          '<button class="btn btn-sm btn-ghost" data-toggle-active="' + u.id + '">' + (u.active ? t("Вимкнути") : t("Увімкнути")) + '</button>' +
-          (u.id === state.me.id ? '' : '<button class="icon-btn" data-del-user="' + u.id + '" title="' + t("Видалити") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button>') +
-        '</div></td></tr>';
+        balanceCell +
+        '<td><div class="row-actions">' + actions + '</div></td></tr>';
     }).join("");
 
     tbody.querySelectorAll("[data-reset-pw]").forEach(function (btn) {
@@ -1756,6 +1889,12 @@
         if (!confirm(t("Видалити цей обліковий запис?"))) return;
         api("DELETE", "/api/users/" + btn.getAttribute("data-del-user")).then(function () { toast("Акаунт видалено"); loadAll(); }).catch(function (err) { toast(err.message, true); });
       });
+    });
+    tbody.querySelectorAll("[data-open-perms]").forEach(function (btn) {
+      btn.addEventListener("click", function () { openPermissionsModal(btn.getAttribute("data-open-perms")); });
+    });
+    tbody.querySelectorAll("[data-open-balance]").forEach(function (btn) {
+      btn.addEventListener("click", function () { openBalanceModal(btn.getAttribute("data-open-balance")); });
     });
   }
 
@@ -2766,6 +2905,107 @@
       if (!data.username || !data.password) { toast("Заповніть логін і пароль", true); return; }
       api("POST", "/api/users", data).then(function () { toast("Співробітника додано"); closeOverlay(); loadAll(); })
         .catch(function (err) { toast(err.message, true); });
+    });
+  }
+
+  /* ============ owner-managed permissions ============ */
+  // Mirrors lib/auth.js's PERMISSION_KEYS — the specific, individually
+  // grantable capabilities that sit outside (and aren't implied by) the
+  // admin/employee role. Only the owner ever sees the "Дозволи" button
+  // that opens this.
+  var PERMISSION_DEFS = [
+    { key: "editOthersSchedule", label: "Редагування графіку вихідних інших співробітників" },
+    { key: "viewOthersSchedule", label: "Перегляд вихідних інших співробітників" },
+    { key: "viewOthersBalance", label: "Перегляд балансу інших співробітників" },
+    { key: "viewEarnings", label: "Перегляд загального заробітку" },
+    { key: "editClients", label: "Зміна даних клієнта" },
+    { key: "showClientsCount", label: "Дашборд: кількість клієнтів" },
+    { key: "showOrdersCount", label: "Дашборд: кількість замовлень" },
+    { key: "showDebt", label: "Дашборд: заборгованість (неоплачено)" },
+    { key: "showBalance", label: "Дашборд: баланс" }
+  ];
+
+  function openPermissionsModal(userId) {
+    var u = state.users.find(function (x) { return x.id === userId; });
+    if (!u) return;
+    var perms = u.permissions || {};
+    var root = document.getElementById("modal-root");
+    root.innerHTML =
+      '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
+        '<div class="modal-head"><h3>' + t("Дозволи: ") + escapeHtml(u.name) + '</h3>' +
+          '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+        '<div class="modal-body" style="display:flex; flex-direction:column; gap:10px;">' +
+          PERMISSION_DEFS.map(function (def) {
+            return '<label class="checkbox-field"><input type="checkbox" data-perm="' + def.key + '"' + (perms[def.key] ? " checked" : "") + '> ' + t(def.label) + '</label>';
+          }).join("") +
+        '</div>' +
+        '<div class="modal-foot"><span></span><button class="btn btn-primary" id="ov-save">' + t("Зберегти") + '</button></div></div></div>';
+
+    document.getElementById("ov-close").addEventListener("click", closeOverlay);
+    document.getElementById("ov-backdrop").addEventListener("click", function (e) { if (e.target.id === "ov-backdrop") closeOverlay(); });
+    document.getElementById("ov-save").addEventListener("click", function () {
+      var patch = {};
+      document.querySelectorAll("[data-perm]").forEach(function (cb) { patch[cb.getAttribute("data-perm")] = cb.checked; });
+      api("PATCH", "/api/users/" + userId, { permissions: patch }).then(function () {
+        toast(t("Дозволи оновлено")); closeOverlay(); loadAll();
+      }).catch(function (err) { toast(err.message, true); });
+    });
+  }
+
+  /* ============ owner-managed worker balance ledger ============ */
+  function openBalanceModal(userId) {
+    var u = state.users.find(function (x) { return x.id === userId; });
+    if (!u) return;
+    renderBalanceModalBody(userId, u);
+  }
+
+  function renderBalanceModalBody(userId, u) {
+    var entries = balanceEntriesFor(userId);
+    var total = balanceTotalFor(userId);
+    var root = document.getElementById("modal-root");
+    root.innerHTML =
+      '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
+        '<div class="modal-head"><h3>' + t("Баланс: ") + escapeHtml(u.name) + '</h3>' +
+          '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+        '<div class="modal-body">' +
+          '<div class="kv-row" style="margin-bottom:12px;"><div class="k">' + t("Поточний баланс") + '</div><div class="v" style="font-weight:700;">' + fmtMoney(total) + '</div></div>' +
+          '<div class="field-row" style="align-items:flex-end; margin-bottom:14px;">' +
+            '<div class="field"><label>' + t("Сума (+ нараховано, − виплачено)") + '</label><input type="number" step="0.01" id="bal-amount" placeholder="250 / -100"></div>' +
+            '<div class="field"><label>' + t("Примітка") + '</label><input type="text" id="bal-note" placeholder="' + t("напр. за тиждень") + '"></div>' +
+          '</div>' +
+          '<button class="btn btn-sm btn-primary" id="bal-add" type="button">' + t("Додати запис") + '</button>' +
+          '<div style="margin-top:16px;">' +
+          (entries.length ? entries.map(function (b) {
+            return '<div class="job-row"><div class="agenda-main"><div class="title">' + fmtMoney(b.amount) + (b.note ? " — " + escapeHtml(b.note) : "") + '</div><div class="cell-sub">' + fmtDateHuman(b.date) + '</div></div>' +
+              '<button class="icon-btn" data-del-balance="' + b.id + '" title="' + t("Видалити") + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button></div>';
+          }).join("") : '<div class="empty-note">' + t("Записів ще немає.") + '</div>') +
+          '</div>' +
+        '</div>' +
+        '<div class="modal-foot"><span></span><button class="btn" id="ov-close2">' + t("Закрити") + '</button></div></div></div>';
+
+    document.getElementById("ov-close").addEventListener("click", closeOverlay);
+    document.getElementById("ov-close2").addEventListener("click", closeOverlay);
+    document.getElementById("ov-backdrop").addEventListener("click", function (e) { if (e.target.id === "ov-backdrop") closeOverlay(); });
+    document.getElementById("bal-add").addEventListener("click", function () {
+      var amount = Number(String(document.getElementById("bal-amount").value).replace(",", "."));
+      var note = document.getElementById("bal-note").value.trim();
+      if (!amount) { toast(t("Вкажіть суму"), true); return; }
+      api("POST", "/api/balances", { userId: userId, amount: amount, note: note }).then(function (rec) {
+        state.balances.set(rec.id, rec);
+        toast(t("Запис додано"));
+        renderBalanceModalBody(userId, u);
+        renderTeam();
+      }).catch(function (err) { toast(err.message, true); });
+    });
+    root.querySelectorAll("[data-del-balance]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-del-balance");
+        api("DELETE", "/api/balances/" + id).then(function () {
+          state.balances.delete(id);
+          renderBalanceModalBody(userId, u);
+          renderTeam();
+        }).catch(function (err) { toast(err.message, true); });
+      });
     });
   }
 

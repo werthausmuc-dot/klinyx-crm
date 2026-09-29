@@ -152,11 +152,13 @@
       </div>
 
       <div class="stat-grid">
-        <div class="stat-tile"><div class="label" data-i18n="Клієнтів усього">Клієнтів усього</div><div class="value" id="stat-clients">0</div></div>
+        <div class="stat-tile" id="stat-tile-clients"><div class="label" data-i18n="Клієнтів усього">Клієнтів усього</div><div class="value" id="stat-clients">0</div></div>
+        <div class="stat-tile accent" id="stat-tile-orders-count"><div class="label" data-i18n="Кількість замовлень">Кількість замовлень</div><div class="value" id="stat-orders-count">0</div></div>
         <div class="stat-tile accent"><div class="label" data-i18n="Завдань цього тижня">Завдань цього тижня</div><div class="value" id="stat-week-jobs">0</div></div>
         <div class="stat-tile"><div class="label" data-i18n="Сьогодні заплановано">Сьогодні заплановано</div><div class="value" id="stat-today">0</div></div>
-        <div class="stat-tile warn"><div class="label" data-i18n="Неоплачено">Неоплачено</div><div class="value" id="stat-unpaid">€0</div></div>
-        <div class="stat-tile accent"><div class="label" data-i18n="Орієнтовний заробіток за місяць">Орієнтовний заробіток за місяць</div><div class="value" id="stat-month-income">€0</div></div>
+        <div class="stat-tile warn" id="stat-tile-unpaid"><div class="label" data-i18n="Неоплачено">Неоплачено</div><div class="value" id="stat-unpaid">€0</div></div>
+        <div class="stat-tile accent" id="stat-tile-month-income"><div class="label" data-i18n="Орієнтовний заробіток за місяць">Орієнтовний заробіток за місяць</div><div class="value" id="stat-month-income">€0</div></div>
+        <div class="stat-tile" id="stat-tile-balance"><div class="label" data-i18n="Баланс">Баланс</div><div class="value" id="stat-balance">€0</div></div>
       </div>
 
       <div class="dash-grid">
@@ -193,7 +195,7 @@
             <div class="panel-head"><h3 data-i18n="Потребують уваги">Потребують уваги</h3></div>
             <div id="reminders-list"></div>
           </div>
-          <div class="panel">
+          <div class="panel" id="panel-finance">
             <div class="panel-head"><h3 data-i18n="Фінансові підсумки">Фінансові підсумки</h3></div>
             <div class="kv" style="padding:2px 4px;">
               <div class="kv-row"><div class="k" data-i18n="Цей тиждень">Цей тиждень</div><div class="v" id="fin-week">—</div></div>
@@ -302,7 +304,7 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th data-i18n="Ім'я">Ім'я</th><th data-i18n="Логін">Логін</th><th data-i18n="Роль">Роль</th><th data-i18n="Статус">Статус</th><th>Telegram</th><th></th></tr></thead>
+          <thead><tr><th data-i18n="Ім'я">Ім'я</th><th data-i18n="Логін">Логін</th><th data-i18n="Роль">Роль</th><th data-i18n="Статус">Статус</th><th>Telegram</th><th id="th-balance" data-i18n="Баланс" hidden>Баланс</th><th></th></tr></thead>
           <tbody id="users-tbody"></tbody>
         </table>
       </div>
