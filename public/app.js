@@ -723,6 +723,10 @@
     });
     document.documentElement.setAttribute("lang", state.lang);
     document.documentElement.setAttribute("dir", state.lang === "ar" ? "rtl" : "ltr");
+    // Button labels change width across languages (and text direction can
+    // flip entirely for Arabic), so every sliding pill needs repositioning,
+    // not just the language switch's own.
+    refreshAllSegmentedPills();
   }
   function setLang(l) {
     if (l !== "uk" && l !== "de" && l !== "ar") return;
@@ -877,6 +881,37 @@
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
+  }
+
+  // ============ sliding "segmented control" pill ============
+  // Any container with class "segmented" (the sidebar nav, the language
+  // switch, every period/status toggle) gets one absolutely-positioned
+  // ".segmented-pill" child here, sized and moved to exactly cover whichever
+  // sibling carries ".active". CSS gives it a spring transition, so flipping
+  // between options looks like the pill glides over rather than the
+  // highlight just jumping — called after anything that can change which
+  // child is "active", plus once on window resize since button widths can
+  // depend on the viewport (e.g. RTL, wrapped chips).
+  function updateSegmentedPill(container) {
+    if (!container) return;
+    var pill = container.querySelector(".segmented-pill");
+    if (!pill) {
+      pill = document.createElement("div");
+      pill.className = "segmented-pill";
+      container.insertBefore(pill, container.firstChild);
+    }
+    var active = container.querySelector(".active");
+    if (!active) { pill.classList.remove("ready"); return; }
+    var cRect = container.getBoundingClientRect();
+    var aRect = active.getBoundingClientRect();
+    if (!aRect.width && !aRect.height) { pill.classList.remove("ready"); return; }
+    pill.style.width = aRect.width + "px";
+    pill.style.height = aRect.height + "px";
+    pill.style.transform = "translate(" + (aRect.left - cRect.left) + "px," + (aRect.top - cRect.top) + "px)";
+    pill.classList.add("ready");
+  }
+  function refreshAllSegmentedPills() {
+    document.querySelectorAll(".segmented").forEach(updateSegmentedPill);
   }
 
   // Renders free-text description line by line. A line shaped like
@@ -1312,6 +1347,12 @@
     document.querySelectorAll("#income-period-toggle [data-period]").forEach(function (btn) {
       btn.classList.toggle("active", btn.getAttribute("data-period") === period);
     });
+    // renderDashboard() is also called directly by the period-toggle click
+    // handlers (not just via the top-level render()), so the pills have to
+    // be refreshed here too or switching день/тиждень/місяць wouldn't move
+    // the sliding highlight until some unrelated re-render happened to run.
+    updateSegmentedPill(document.getElementById("task-period-toggle"));
+    updateSegmentedPill(document.getElementById("income-period-toggle"));
 
     renderCalendar();
     renderAgenda();
@@ -1824,6 +1865,7 @@
     tbody.querySelectorAll("[data-edit-client]").forEach(function (btn) {
       btn.addEventListener("click", function (ev) { ev.stopPropagation(); openClientModal(btn.getAttribute("data-edit-client")); });
     });
+    updateSegmentedPill(document.getElementById("clients-status-chips"));
   }
 
   /* ============ render: invoices ============ */
@@ -1910,6 +1952,7 @@
         api("DELETE", "/api/invoices/" + btn.getAttribute("data-del-invoice")).then(function () { toast("Рахунок видалено"); loadAll(); });
       });
     });
+    refreshAllSegmentedPills();
   }
 
   function exportInvoicesCsv() {
@@ -2127,6 +2170,7 @@
       tabsWrap.querySelectorAll("[data-orders-tab]").forEach(function (chip) {
         chip.classList.toggle("active", chip.getAttribute("data-orders-tab") === state.ordersTab);
       });
+      updateSegmentedPill(tabsWrap);
       if (!tabsWrap.dataset.wired) {
         tabsWrap.dataset.wired = "1";
         tabsWrap.querySelectorAll("[data-orders-tab]").forEach(function (chip) {
@@ -3158,6 +3202,7 @@
     if (state.me.role === "admin") {
       document.getElementById("nav-count-inventory").textContent = inventoryList().filter(function (it) { return it.low; }).length || "";
     }
+    refreshAllSegmentedPills();
   }
 
   /* ============ mobile menu (hamburger) ============ */
@@ -3179,6 +3224,16 @@
   /* ============ static wiring ============ */
   document.querySelectorAll(".nav-item").forEach(function (el) {
     el.addEventListener("click", function () { setView(el.getAttribute("data-view")); closeMobileMenu(); });
+  });
+  // Sliding pills are sized in real pixels, so anything that can resize or
+  // reflow the page (window resize, opening the mobile sidebar, rotating a
+  // phone) needs to reposition them — rAF-throttled so a drag-resize doesn't
+  // spam layout reads.
+  var segmentedResizePending = false;
+  window.addEventListener("resize", function () {
+    if (segmentedResizePending) return;
+    segmentedResizePending = true;
+    requestAnimationFrame(function () { segmentedResizePending = false; refreshAllSegmentedPills(); });
   });
   document.getElementById("btn-new-client").addEventListener("click", function () { openClientModal(null); });
   document.getElementById("btn-new-client-dash").addEventListener("click", function () { openClientModal(null); });

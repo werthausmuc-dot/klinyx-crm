@@ -70,7 +70,7 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <nav class="primary-nav">
+    <nav class="primary-nav segmented">
       <button class="nav-item" data-view="dashboard">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
         <span data-i18n="Дашборд">Дашборд</span>
@@ -108,7 +108,7 @@
       </button>
     </nav>
     <div class="sidebar-footer">
-      <div class="lang-switch">
+      <div class="lang-switch segmented">
         <button type="button" class="lang-btn" data-lang="uk">UA</button>
         <button type="button" class="lang-btn" data-lang="de">DE</button>
         <button type="button" class="lang-btn" data-lang="ar">AR</button>
@@ -157,7 +157,7 @@
         <div class="stat-tile accent">
           <div class="stat-tile-head">
             <div class="label" id="stat-task-label" data-i18n="Завдань цього тижня">Завдань цього тижня</div>
-            <div class="stat-tile-toggle" id="task-period-toggle">
+            <div class="stat-tile-toggle segmented" id="task-period-toggle">
               <button type="button" class="period-btn active" data-period="week" data-i18n="Т">Т</button>
               <button type="button" class="period-btn" data-period="month" data-i18n="М">М</button>
               <button type="button" class="period-btn" data-period="year" data-i18n="Р">Р</button>
@@ -170,7 +170,7 @@
         <div class="stat-tile accent" id="stat-tile-month-income">
           <div class="stat-tile-head">
             <div class="label" id="stat-income-label" data-i18n="Орієнтовний заробіток за місяць">Орієнтовний заробіток за місяць</div>
-            <div class="stat-tile-toggle" id="income-period-toggle">
+            <div class="stat-tile-toggle segmented" id="income-period-toggle">
               <button type="button" class="period-btn" data-period="day" data-i18n="Д">Д</button>
               <button type="button" class="period-btn" data-period="week" data-i18n="Т">Т</button>
               <button type="button" class="period-btn active" data-period="month" data-i18n="М">М</button>
@@ -242,10 +242,12 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
           <input type="text" id="client-search" placeholder="Пошук за ім'ям, телефоном, адресою..." data-i18n-placeholder="Пошук за ім'ям, телефоном, адресою...">
         </div>
-        <button class="filter-chip active" data-status="all" data-i18n="Усі">Усі</button>
-        <button class="filter-chip" data-status="lead" data-i18n="Ліди">Ліди</button>
-        <button class="filter-chip" data-status="active" data-i18n="Активні">Активні</button>
-        <button class="filter-chip" data-status="inactive" data-i18n="Неактивні">Неактивні</button>
+        <div class="segmented chip-segmented" id="clients-status-chips">
+          <button class="filter-chip active" data-status="all" data-i18n="Усі">Усі</button>
+          <button class="filter-chip" data-status="lead" data-i18n="Ліди">Ліди</button>
+          <button class="filter-chip" data-status="active" data-i18n="Активні">Активні</button>
+          <button class="filter-chip" data-status="inactive" data-i18n="Неактивні">Неактивні</button>
+        </div>
       </div>
       <div class="table-wrap">
         <table>
@@ -276,7 +278,7 @@
         <div class="stat-tile warn"><div class="label" data-i18n="Неоплачено">Неоплачено</div><div class="value" id="inv-unpaid">€0</div></div>
         <div class="stat-tile accent"><div class="label" data-i18n="Оплачено">Оплачено</div><div class="value" id="inv-paid">€0</div></div>
       </div>
-      <div class="toolbar">
+      <div class="toolbar segmented chip-segmented">
         <button class="filter-chip active" data-inv-status="all" data-i18n="Усі">Усі</button>
         <button class="filter-chip" data-inv-status="unpaid" data-i18n="Неоплачені">Неоплачені</button>
         <button class="filter-chip" data-inv-status="overdue" data-i18n="Прострочені">Прострочені</button>
@@ -369,7 +371,7 @@
           </button>
         </div>
       </div>
-      <div class="toolbar" id="orders-tabs">
+      <div class="toolbar segmented chip-segmented" id="orders-tabs">
         <button class="filter-chip active" type="button" data-orders-tab="manual" data-i18n="Додані вручну">Додані вручну</button>
         <button class="filter-chip" type="button" data-orders-tab="auto" data-i18n="Рекомендовані (авто)">Рекомендовані (авто)</button>
       </div>
