@@ -1,7 +1,19 @@
 const crypto = require("crypto");
 const store = require("../lib/store");
-const { requireAuth, requireAdmin } = require("../lib/auth");
+const { requireAuth, requireAdmin, hasPermission } = require("../lib/auth");
 const { sendJson, readJsonBody } = require("../lib/http-utils");
+
+// The "Замовлення" tab (order-source platform widgets) is now owner-granted
+// via "viewOrders" — nobody sees it by default except the owner. Nothing
+// else in the app reads this data, so it's safe to block outright.
+function requireOrdersView(req, res) {
+  if (!requireAuth(req, res)) return false;
+  if (!hasPermission(req.user, "viewOrders")) {
+    sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до замовлень." });
+    return false;
+  }
+  return true;
+}
 
 function clean(body) {
   const data = {};
@@ -18,15 +30,16 @@ function clean(body) {
 }
 
 module.exports = function registerPlatformRoutes(router) {
-  // Anyone signed in can see and use the quick-access widgets.
   router.get("/api/platforms", async (req, res) => {
-    if (!requireAuth(req, res)) return;
+    if (!requireOrdersView(req, res)) return;
     sendJson(res, 200, await store.list("platforms"));
   });
 
-  // Only admins curate the widget list itself.
+  // Only admins curate the widget list itself — and only once the owner has
+  // opened this tab for them at all.
   router.post("/api/platforms", async (req, res) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewOrders")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до замовлень." });
     const body = await readJsonBody(req);
     const data = clean(body);
     if (!data.title) return sendJson(res, 400, { error: "invalid_input", message: "Вкажіть назву платформи." });
@@ -39,6 +52,7 @@ module.exports = function registerPlatformRoutes(router) {
 
   router.patch("/api/platforms/:id", async (req, res, params) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewOrders")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до замовлень." });
     const existing = await store.get("platforms", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     const body = await readJsonBody(req);
@@ -48,6 +62,7 @@ module.exports = function registerPlatformRoutes(router) {
 
   router.delete("/api/platforms/:id", async (req, res, params) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewOrders")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до замовлень." });
     const existing = await store.get("platforms", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     await store.remove("platforms", params.id);
@@ -59,6 +74,7 @@ module.exports = function registerPlatformRoutes(router) {
   // itself rather than a separate collection.
   router.post("/api/platforms/:id/notes", async (req, res, params) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewOrders")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до замовлень." });
     const existing = await store.get("platforms", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     const body = await readJsonBody(req);
@@ -71,6 +87,7 @@ module.exports = function registerPlatformRoutes(router) {
 
   router.delete("/api/platforms/:id/notes/:noteId", async (req, res, params) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewOrders")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до замовлень." });
     const existing = await store.get("platforms", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     const notes = (Array.isArray(existing.notes) ? existing.notes : []).filter((n) => n.id !== params.noteId);
@@ -82,6 +99,7 @@ module.exports = function registerPlatformRoutes(router) {
   // lost when it flips back and forth.
   router.post("/api/platforms/:id/tasks", async (req, res, params) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewOrders")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до замовлень." });
     const existing = await store.get("platforms", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     const body = await readJsonBody(req);
@@ -95,6 +113,7 @@ module.exports = function registerPlatformRoutes(router) {
 
   router.patch("/api/platforms/:id/tasks/:taskId", async (req, res, params) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewOrders")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до замовлень." });
     const existing = await store.get("platforms", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     const body = await readJsonBody(req);
@@ -115,6 +134,7 @@ module.exports = function registerPlatformRoutes(router) {
 
   router.delete("/api/platforms/:id/tasks/:taskId", async (req, res, params) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewOrders")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до замовлень." });
     const existing = await store.get("platforms", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     const tasks = (Array.isArray(existing.tasks) ? existing.tasks : []).filter((t) => t.id !== params.taskId);
