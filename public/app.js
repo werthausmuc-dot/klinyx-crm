@@ -203,11 +203,12 @@
     "Дашборд": "Dashboard", "Клієнти": "Kunden", "Склад": "Lager", "Команда": "Team",
     "План розвитку": "Entwicklungsplan", "Замовлення": "Aufträge", "Вийти": "Abmelden",
     "Клієнтів усього": "Kunden gesamt", "Завдань цього тижня": "Aufträge diese Woche",
+    "Завдань цього місяця": "Aufträge diesen Monat", "Завдань цього року": "Aufträge dieses Jahr",
     "Сьогодні заплановано": "Heute geplant", "Неоплачено": "Unbezahlt",
     "Орієнтовний заробіток за місяць": "Geschätztes Monatseinkommen",
     "Орієнтовний заробіток за сьогодні": "Geschätztes Tageseinkommen",
     "Орієнтовний заробіток за тиждень": "Geschätztes Wocheneinkommen",
-    "Д": "T", "Т": "W", "М": "M",
+    "Д": "T", "Т": "W", "М": "M", "Р": "J",
     "Календар завдань": "Auftragskalender", "План на день": "Plan für den Tag",
     "Напр. Подзвонити постачальнику...": "Z. B. Lieferanten anrufen...",
     "Потребують уваги": "Erfordert Aufmerksamkeit", "Фінансові підсумки": "Finanzübersicht",
@@ -569,12 +570,14 @@
       "Вийти": "تسجيل الخروج",
       "Клієнтів усього": "إجمالي العملاء",
       "Завдань цього тижня": "مهام هذا الأسبوع",
+      "Завдань цього місяця": "مهام هذا الشهر",
+      "Завдань цього року": "مهام هذا العام",
       "Сьогодні заплановано": "مجدول اليوم",
       "Неоплачено": "غير مدفوع",
       "Орієнтовний заробіток за місяць": "الدخل التقديري لهذا الشهر",
       "Орієнтовний заробіток за сьогодні": "الدخل التقديري لهذا اليوم",
       "Орієнтовний заробіток за тиждень": "الدخل التقديري لهذا الأسبوع",
-      "Д": "ي", "Т": "أ", "М": "ش",
+      "Д": "ي", "Т": "أ", "М": "ش", "Р": "س",
       "Календар завдань": "تقويم المهام",
       "План на день": "خطة اليوم",
       "Напр. Подзвонити постачальнику...": "مثال: الاتصال بالمورد...",
@@ -691,6 +694,17 @@
   function saveIncomePeriod(p) {
     try { localStorage.setItem("klinyx_income_period", p); } catch (e) { /* ignore */ }
   }
+  // Same idea for the "Завдань..." task-count tile — switchable between
+  // тиждень/місяць/рік, remembered per browser.
+  function loadTaskPeriod() {
+    try {
+      var p = localStorage.getItem("klinyx_task_period");
+      return (p === "month" || p === "year") ? p : "week";
+    } catch (e) { return "week"; }
+  }
+  function saveTaskPeriod(p) {
+    try { localStorage.setItem("klinyx_task_period", p); } catch (e) { /* ignore */ }
+  }
   function applyStaticI18n() {
     document.querySelectorAll("[data-i18n]").forEach(function (el) {
       el.textContent = t(el.getAttribute("data-i18n"));
@@ -806,6 +820,7 @@
     telegram: null,
     lang: loadLang(),
     incomePeriod: loadIncomePeriod(),
+    taskPeriod: loadTaskPeriod(),
     view: "dashboard",
     calYear: new Date().getFullYear(),
     calMonth: new Date().getMonth(),
@@ -841,6 +856,11 @@
   function monthRange(d) {
     var first = new Date(d.getFullYear(), d.getMonth(), 1);
     var last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return { start: fmtDate(first), end: fmtDate(last) };
+  }
+  function yearRange(d) {
+    var first = new Date(d.getFullYear(), 0, 1);
+    var last = new Date(d.getFullYear(), 11, 31);
     return { start: fmtDate(first), end: fmtDate(last) };
   }
   function fmtDateHuman(s) {
@@ -1216,13 +1236,26 @@
     // rolling 7 days from today — otherwise the count would jump around
     // depending on which day of the week "today" happens to be.
     var wr = weekRange(today);
-    var weekJobs = jobs.filter(function (j) { return j.status === "scheduled" && j.date >= wr.start && j.date <= wr.end; });
     var todayJobs = jobs.filter(function (j) { return j.date === todayS && j.status !== "cancelled"; });
     var unpaidSum = invoicesList().filter(function (i) { return i.status === "unpaid"; }).reduce(function (s, i) { return s + (Number(i.amount) || 0); }, 0);
 
+    // "Завдань..." tile is switchable between тиждень/місяць/рік — same
+    // scheduled-only count as before, just over a wider window when asked.
+    var taskMr = monthRange(today);
+    var taskYr = yearRange(today);
+    function countScheduled(range) { return jobs.filter(function (j) { return j.status === "scheduled" && j.date >= range.start && j.date <= range.end; }).length; }
+    var taskCountByPeriod = { week: countScheduled(wr), month: countScheduled(taskMr), year: countScheduled(taskYr) };
+    var taskLabelKey = { week: "Завдань цього тижня", month: "Завдань цього місяця", year: "Завдань цього року" };
+    var taskPeriod = taskCountByPeriod.hasOwnProperty(state.taskPeriod) ? state.taskPeriod : "week";
+
     document.getElementById("stat-clients").textContent = state.clients.size;
     document.getElementById("stat-orders-count").textContent = jobs.length;
-    document.getElementById("stat-week-jobs").textContent = weekJobs.length;
+    document.getElementById("stat-week-jobs").textContent = taskCountByPeriod[taskPeriod];
+    var taskLabel = document.getElementById("stat-task-label");
+    if (taskLabel) taskLabel.textContent = t(taskLabelKey[taskPeriod]);
+    document.querySelectorAll("#task-period-toggle [data-period]").forEach(function (btn) {
+      btn.classList.toggle("active", btn.getAttribute("data-period") === taskPeriod);
+    });
     document.getElementById("stat-today").textContent = todayJobs.length;
     document.getElementById("stat-unpaid").textContent = fmtMoney(unpaidSum);
     document.getElementById("stat-balance").textContent = fmtMoney(balanceTotalAll());
@@ -3164,6 +3197,15 @@
       if (p === state.incomePeriod) return;
       state.incomePeriod = p;
       saveIncomePeriod(p);
+      renderDashboard();
+    });
+  });
+  document.querySelectorAll("#task-period-toggle [data-period]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var p = btn.getAttribute("data-period");
+      if (p === state.taskPeriod) return;
+      state.taskPeriod = p;
+      saveTaskPeriod(p);
       renderDashboard();
     });
   });
