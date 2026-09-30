@@ -205,6 +205,9 @@
     "Клієнтів усього": "Kunden gesamt", "Завдань цього тижня": "Aufträge diese Woche",
     "Сьогодні заплановано": "Heute geplant", "Неоплачено": "Unbezahlt",
     "Орієнтовний заробіток за місяць": "Geschätztes Monatseinkommen",
+    "Орієнтовний заробіток за сьогодні": "Geschätztes Tageseinkommen",
+    "Орієнтовний заробіток за тиждень": "Geschätztes Wocheneinkommen",
+    "Д": "T", "Т": "W", "М": "M",
     "Календар завдань": "Auftragskalender", "План на день": "Plan für den Tag",
     "Напр. Подзвонити постачальнику...": "Z. B. Lieferanten anrufen...",
     "Потребують уваги": "Erfordert Aufmerksamkeit", "Фінансові підсумки": "Finanzübersicht",
@@ -569,6 +572,9 @@
       "Сьогодні заплановано": "مجدول اليوم",
       "Неоплачено": "غير مدفوع",
       "Орієнтовний заробіток за місяць": "الدخل التقديري لهذا الشهر",
+      "Орієнтовний заробіток за сьогодні": "الدخل التقديري لهذا اليوم",
+      "Орієнтовний заробіток за тиждень": "الدخل التقديري لهذا الأسبوع",
+      "Д": "ي", "Т": "أ", "М": "ش",
       "Календар завдань": "تقويم المهام",
       "План на день": "خطة اليوم",
       "Напр. Подзвонити постачальнику...": "مثال: الاتصال بالمورد...",
@@ -672,6 +678,18 @@
   }
   function saveLang(l) {
     try { localStorage.setItem("klinyx_lang", l); } catch (e) { /* ignore */ }
+  }
+  // Which period the "Орієнтовний заробіток" dashboard tile currently shows
+  // (день/тиждень/місяць) — remembered per browser so it doesn't reset to
+  // month every time the page reloads.
+  function loadIncomePeriod() {
+    try {
+      var p = localStorage.getItem("klinyx_income_period");
+      return (p === "day" || p === "week") ? p : "month";
+    } catch (e) { return "month"; }
+  }
+  function saveIncomePeriod(p) {
+    try { localStorage.setItem("klinyx_income_period", p); } catch (e) { /* ignore */ }
   }
   function applyStaticI18n() {
     document.querySelectorAll("[data-i18n]").forEach(function (el) {
@@ -787,6 +805,7 @@
     roster: [],
     telegram: null,
     lang: loadLang(),
+    incomePeriod: loadIncomePeriod(),
     view: "dashboard",
     calYear: new Date().getFullYear(),
     calMonth: new Date().getMonth(),
@@ -1233,15 +1252,33 @@
     var monthTotal = sumPrice(monthJobsF), monthPaid = sumPrice(monthJobsF.filter(function (j) { return j.paid; }));
     document.getElementById("fin-week").textContent = fmtMoney(weekTotal) + t(" (оплачено ") + fmtMoney(weekPaid) + ")";
     document.getElementById("fin-month").textContent = fmtMoney(monthTotal) + t(" (оплачено ") + fmtMoney(monthPaid) + ")";
-    // "Орієнтовний заробіток за місяць" tracks whichever calendar month the
-    // task-calendar widget is currently showing (state.calYear/calMonth),
-    // not always the real-world current month — so it updates when the
-    // person pages the calendar forward/back.
+    // "Орієнтовний заробіток" tile is switchable between день/тиждень/місяць
+    // (state.incomePeriod). The month option still tracks whichever calendar
+    // month the task-calendar widget is currently showing (state.calYear/
+    // calMonth), not always the real-world current month, so it keeps
+    // updating when the person pages the calendar forward/back; day and
+    // week are always relative to today, matching the other dashboard tiles.
     var calMr = monthRange(new Date(state.calYear, state.calMonth, 1));
     var calMonthJobsF = jobs.filter(function (j) { return j.status !== "cancelled" && j.date >= calMr.start && j.date <= calMr.end; });
-    var calMonthTotal = sumPrice(calMonthJobsF);
+    var todayJobsF = jobs.filter(function (j) { return j.status !== "cancelled" && j.date === todayS; });
+    var incomeByPeriod = {
+      day: sumPrice(todayJobsF),
+      week: sumPrice(weekJobsF),
+      month: sumPrice(calMonthJobsF)
+    };
+    var incomeLabelKey = {
+      day: "Орієнтовний заробіток за сьогодні",
+      week: "Орієнтовний заробіток за тиждень",
+      month: "Орієнтовний заробіток за місяць"
+    };
+    var period = incomeByPeriod.hasOwnProperty(state.incomePeriod) ? state.incomePeriod : "month";
     var statMonthIncome = document.getElementById("stat-month-income");
-    if (statMonthIncome) statMonthIncome.textContent = fmtMoney(calMonthTotal);
+    if (statMonthIncome) statMonthIncome.textContent = fmtMoney(incomeByPeriod[period]);
+    var incomeLabel = document.getElementById("stat-income-label");
+    if (incomeLabel) incomeLabel.textContent = t(incomeLabelKey[period]);
+    document.querySelectorAll("#income-period-toggle [data-period]").forEach(function (btn) {
+      btn.classList.toggle("active", btn.getAttribute("data-period") === period);
+    });
 
     renderCalendar();
     renderAgenda();
@@ -3119,6 +3156,16 @@
   document.getElementById("btn-new-order").addEventListener("click", function () { openPlatformModal(null); });
   var btnExportInvoices = document.getElementById("btn-export-invoices");
   if (btnExportInvoices) btnExportInvoices.addEventListener("click", exportInvoicesCsv);
+
+  document.querySelectorAll("#income-period-toggle [data-period]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var p = btn.getAttribute("data-period");
+      if (p === state.incomePeriod) return;
+      state.incomePeriod = p;
+      saveIncomePeriod(p);
+      renderDashboard();
+    });
+  });
 
   document.getElementById("cal-prev").addEventListener("click", function () {
     state.calMonth--; if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; }

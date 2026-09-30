@@ -157,7 +157,17 @@
         <div class="stat-tile accent"><div class="label" data-i18n="Завдань цього тижня">Завдань цього тижня</div><div class="value" id="stat-week-jobs">0</div></div>
         <div class="stat-tile"><div class="label" data-i18n="Сьогодні заплановано">Сьогодні заплановано</div><div class="value" id="stat-today">0</div></div>
         <div class="stat-tile warn" id="stat-tile-unpaid"><div class="label" data-i18n="Неоплачено">Неоплачено</div><div class="value" id="stat-unpaid">€0</div></div>
-        <div class="stat-tile accent" id="stat-tile-month-income"><div class="label" data-i18n="Орієнтовний заробіток за місяць">Орієнтовний заробіток за місяць</div><div class="value" id="stat-month-income">€0</div></div>
+        <div class="stat-tile accent" id="stat-tile-month-income">
+          <div class="stat-tile-head">
+            <div class="label" id="stat-income-label" data-i18n="Орієнтовний заробіток за місяць">Орієнтовний заробіток за місяць</div>
+            <div class="stat-tile-toggle" id="income-period-toggle">
+              <button type="button" class="period-btn" data-period="day" data-i18n="Д">Д</button>
+              <button type="button" class="period-btn" data-period="week" data-i18n="Т">Т</button>
+              <button type="button" class="period-btn active" data-period="month" data-i18n="М">М</button>
+            </div>
+          </div>
+          <div class="value" id="stat-month-income">€0</div>
+        </div>
         <div class="stat-tile" id="stat-tile-balance"><div class="label" data-i18n="Баланс">Баланс</div><div class="value" id="stat-balance">€0</div></div>
       </div>
 
