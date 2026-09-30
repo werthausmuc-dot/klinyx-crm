@@ -263,6 +263,12 @@
     "Дашборд: кількість замовлень": "Dashboard: Anzahl Aufträge",
     "Дашборд: заборгованість (неоплачено)": "Dashboard: Außenstände (unbezahlt)",
     "Дашборд: баланс": "Dashboard: Saldo",
+    "Доступ до вкладок": "Zugriff auf Reiter",
+    "Вкладка «Рахунки»": "Reiter „Rechnungen“",
+    "Вкладка «Склад»": "Reiter „Lager“",
+    "Вкладка «Команда»": "Reiter „Team“",
+    "Вкладка «План розвитку»": "Reiter „Entwicklungsplan“",
+    "Вкладка «Замовлення»": "Reiter „Aufträge“",
     "Дозволи оновлено": "Berechtigungen aktualisiert",
     "Баланс: ": "Saldo: ",
     "Поточний баланс": "Aktueller Saldo",
@@ -632,6 +638,12 @@
       "Дашборд: кількість замовлень": "لوحة التحكم: عدد الطلبات",
       "Дашборд: заборгованість (неоплачено)": "لوحة التحكم: المستحقات (غير مدفوعة)",
       "Дашборд: баланс": "لوحة التحكم: الرصيد",
+      "Доступ до вкладок": "الوصول إلى التبويبات",
+      "Вкладка «Рахунки»": "تبويب «الفواتير»",
+      "Вкладка «Склад»": "تبويب «المخزون»",
+      "Вкладка «Команда»": "تبويب «الفريق»",
+      "Вкладка «План розвитку»": "تبويب «خطة التطوير»",
+      "Вкладка «Замовлення»": "تبويب «الطلبات»",
       "Дозволи оновлено": "تم تحديث الصلاحيات",
       "Баланс: ": "الرصيد: ",
       "Поточний баланс": "الرصيد الحالي",
@@ -915,8 +927,20 @@
     document.getElementById("me-name").textContent = user.name || user.username;
     document.getElementById("me-role").textContent = user.isOwner ? t("Власник") : user.role === "admin" ? t("Адміністратор") : t("Співробітник");
     document.getElementById("me-avatar").textContent = (user.name || user.username).trim().slice(0, 1).toUpperCase();
-    document.getElementById("nav-team").hidden = user.role !== "admin";
-    document.getElementById("nav-inventory").hidden = user.role !== "admin";
+    // These five tabs are whole owner-granted blocks now — hidden for
+    // everyone (admin or employee) unless the owner explicitly turned on
+    // the matching permission, the owner themself excepted. hasPerm reads
+    // state.me, which was just set above.
+    document.getElementById("nav-team").hidden = !hasPerm("viewTeam");
+    document.getElementById("nav-inventory").hidden = !hasPerm("viewInventory");
+    document.getElementById("nav-invoices").hidden = !hasPerm("viewInvoices");
+    document.getElementById("nav-roadmap").hidden = !hasPerm("viewRoadmap");
+    document.getElementById("nav-orders").hidden = !hasPerm("viewOrders");
+    // If a permission was just revoked and the person happens to be sitting
+    // on that exact tab right now, bounce them back to the dashboard rather
+    // than leaving a now-forbidden screen on display.
+    var gatedView = VIEW_PERMISSION[state.view];
+    if (gatedView && !hasPerm(gatedView)) setView("dashboard");
   }
 
   function enterApp(user) {
@@ -1084,7 +1108,18 @@
   }
 
   /* ============ navigation ============ */
+  // Mirrors the nav-* hiding in applyMe() — a defensive check in case the
+  // view is switched some other way than clicking the (already-hidden)
+  // nav button, so a revoked/never-granted tab can't be reached at all.
+  var VIEW_PERMISSION = {
+    invoices: "viewInvoices",
+    inventory: "viewInventory",
+    team: "viewTeam",
+    roadmap: "viewRoadmap",
+    orders: "viewOrders"
+  };
   function setView(v) {
+    if (VIEW_PERMISSION[v] && !hasPerm(VIEW_PERMISSION[v])) v = "dashboard";
     state.view = v;
     document.querySelectorAll(".view").forEach(function (el) { el.classList.remove("active"); });
     document.getElementById("view-" + v).classList.add("active");
@@ -2922,7 +2957,13 @@
     { key: "showClientsCount", label: "Дашборд: кількість клієнтів" },
     { key: "showOrdersCount", label: "Дашборд: кількість замовлень" },
     { key: "showDebt", label: "Дашборд: заборгованість (неоплачено)" },
-    { key: "showBalance", label: "Дашборд: баланс" }
+    { key: "showBalance", label: "Дашборд: баланс" },
+    // Whole-tab access — hidden entirely from the sidebar until granted.
+    { key: "viewInvoices", label: "Вкладка «Рахунки»", group: true },
+    { key: "viewInventory", label: "Вкладка «Склад»" },
+    { key: "viewTeam", label: "Вкладка «Команда»" },
+    { key: "viewRoadmap", label: "Вкладка «План розвитку»" },
+    { key: "viewOrders", label: "Вкладка «Замовлення»" }
   ];
 
   function openPermissionsModal(userId) {
@@ -2936,7 +2977,8 @@
           '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
         '<div class="modal-body" style="display:flex; flex-direction:column; gap:10px;">' +
           PERMISSION_DEFS.map(function (def) {
-            return '<label class="checkbox-field"><input type="checkbox" data-perm="' + def.key + '"' + (perms[def.key] ? " checked" : "") + '> ' + t(def.label) + '</label>';
+            var divider = def.group ? '<div style="margin-top:6px; padding-top:10px; border-top:1px solid var(--border); font-size:12px; color:var(--text-muted);">' + t("Доступ до вкладок") + '</div>' : "";
+            return divider + '<label class="checkbox-field"><input type="checkbox" data-perm="' + def.key + '"' + (perms[def.key] ? " checked" : "") + '> ' + t(def.label) + '</label>';
           }).join("") +
         '</div>' +
         '<div class="modal-foot"><span></span><button class="btn btn-primary" id="ov-save">' + t("Зберегти") + '</button></div></div></div>';
