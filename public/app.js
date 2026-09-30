@@ -1193,10 +1193,11 @@
 
     var jobs = jobsSorted();
     var todayS = todayStr();
-    var weekEnd = new Date(); weekEnd.setDate(weekEnd.getDate() + 7);
-    var weekEndS = fmtDate(weekEnd);
-
-    var weekJobs = jobs.filter(function (j) { return j.status === "scheduled" && j.date >= todayS && j.date <= weekEndS; });
+    // "Цього тижня" means the calendar week (понеділок–неділя), not a
+    // rolling 7 days from today — otherwise the count would jump around
+    // depending on which day of the week "today" happens to be.
+    var wr = weekRange(today);
+    var weekJobs = jobs.filter(function (j) { return j.status === "scheduled" && j.date >= wr.start && j.date <= wr.end; });
     var todayJobs = jobs.filter(function (j) { return j.date === todayS && j.status !== "cancelled"; });
     var unpaidSum = invoicesList().filter(function (i) { return i.status === "unpaid"; }).reduce(function (s, i) { return s + (Number(i.amount) || 0); }, 0);
 
@@ -1224,7 +1225,7 @@
     var financePanel = document.getElementById("panel-finance");
     if (financePanel) financePanel.hidden = !hasPerm("viewEarnings");
 
-    var wr = weekRange(today), mr = monthRange(today);
+    var mr = monthRange(today);
     var weekJobsF = jobs.filter(function (j) { return j.status !== "cancelled" && j.date >= wr.start && j.date <= wr.end; });
     var monthJobsF = jobs.filter(function (j) { return j.status !== "cancelled" && j.date >= mr.start && j.date <= mr.end; });
     function sumPrice(list) { return list.reduce(function (s, j) { return s + (Number(j.price) || 0); }, 0); }
