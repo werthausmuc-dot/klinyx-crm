@@ -69,6 +69,8 @@
     "Вкажіть причину відмови:": "Bitte Grund der Ablehnung angeben:",
     "Вкажіть причину відмови": "Bitte Grund der Ablehnung angeben",
     "Причина: ": "Grund: ", "Завдання відхилено": "Auftrag abgelehnt",
+    "Перенести на завтра": "Auf morgen verschieben",
+    "Завдання перенесено на ": "Auftrag verschoben auf ",
     "Напр. клієнт відмовився, поганий стан об'єкта...": "Z. B. Kunde hat abgesagt, schlechter Zustand des Objekts...",
     "Нічого термінового — усе під контролем.": "Nichts Dringendes — alles unter Kontrolle.",
     "Позначити оплаченим": "Als bezahlt markieren", "Скасувати оплату": "Zahlung stornieren",
@@ -333,6 +335,8 @@
       "Вкажіть причину відмови:": "يرجى إدخال سبب الرفض:",
       "Вкажіть причину відмови": "يرجى إدخال سبب الرفض",
       "Причина: ": "السبب: ", "Завдання відхилено": "تم رفض المهمة",
+      "Перенести на завтра": "تأجيل إلى الغد",
+      "Завдання перенесено на ": "تم تأجيل المهمة إلى ",
       "Напр. клієнт відмовився, поганий стан об'єкта...": "مثال: ألغى العميل، حالة سيئة للموقع...",
       "Нічого термінового — усе під контролем.": "لا شيء عاجل — كل شيء تحت السيطرة.",
       "Позначити оплаченим": "تعليم كمدفوع",
@@ -807,6 +811,7 @@
   function pad2(n) { return n < 10 ? "0" + n : "" + n; }
   function fmtDate(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
   function parseDate(s) { var p = s.split("-"); return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)); }
+  function addDaysStr(s, n) { var d = parseDate(s); d.setDate(d.getDate() + n); return fmtDate(d); }
   function weekRange(d) {
     var day = d.getDay();
     var diffToMonday = day === 0 ? -6 : 1 - day;
@@ -1649,6 +1654,7 @@
           '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? t("оплачено") : t("не оплачено")) + '</span>' +
           (j.status === "done" ? '<span class="pill ' + (invoiceForJob(j.id) ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (invoiceForJob(j.id) ? t("рахунок виставлено") : t("рахунок не виставлено")) + '</span>' : '') +
           (j.status === "done" && !invoiceForJob(j.id) ? '<button class="btn btn-sm" data-quick-invoice="' + j.id + '">' + t("Виставити рахунок") + '</button>' : '') +
+          (j.status === "scheduled" ? '<button class="btn btn-sm btn-ghost" data-postpone-job="' + j.id + '">' + t("Перенести на завтра") + '</button>' : '') +
           (j.status === "scheduled" ? '<button class="btn btn-sm btn-ghost" data-decline-job="' + j.id + '">' + t("Відмовити") + '</button>' : '') +
         '</div></div>';
     }).join("");
@@ -1657,6 +1663,19 @@
       btn.addEventListener("click", function (e) {
         e.stopPropagation();
         quickCreateInvoice(btn.getAttribute("data-quick-invoice"));
+      });
+    });
+    listEl.querySelectorAll("[data-postpone-job]").forEach(function (btn) {
+      btn.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var jobId = btn.getAttribute("data-postpone-job");
+        var job = state.jobs.get(jobId);
+        if (!job) return;
+        var nextDate = addDaysStr(job.date, 1);
+        api("PATCH", "/api/jobs/" + jobId, { date: nextDate })
+          .then(function () { toast(t("Завдання перенесено на ") + fmtDateHuman(nextDate)); loadAll(); })
+          .catch(function (err) { toast(err.message, true); });
       });
     });
     listEl.querySelectorAll("[data-decline-job]").forEach(function (btn) {
