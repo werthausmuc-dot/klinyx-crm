@@ -1,11 +1,19 @@
 const store = require("../lib/store");
-const { requireAdmin } = require("../lib/auth");
+const { requireAuth, hasPermission } = require("../lib/auth");
 const { sendJson, readJsonBody } = require("../lib/http-utils");
 
-// Chemical / consumable-supply inventory ("Крок 3" of the roadmap). Kept
-// admin-only end to end — employees don't manage stock or write things off,
-// they just get told to use less when a job costs too much chemical, via
-// the low-stock badge an admin sees here.
+// Chemical / consumable-supply inventory ("Крок 3" of the roadmap). The
+// whole tab is now gated by the owner-granted "viewInventory" permission
+// instead of the admin role — the owner decides who (admin or employee)
+// gets to see and manage stock, nobody has it by default except the owner.
+function requireInventoryAccess(req, res) {
+  if (!requireAuth(req, res)) return false;
+  if (!hasPermission(req.user, "viewInventory")) {
+    sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до складу." });
+    return false;
+  }
+  return true;
+}
 
 const UNITS = ["л", "кг", "шт", "уп"];
 const LOG_TYPES = ["usage", "restock", "adjust"];
@@ -48,14 +56,14 @@ function withLowFlag(item) {
 
 module.exports = function registerInventoryRoutes(router) {
   router.get("/api/inventory", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireInventoryAccess(req, res)) return;
     const items = await store.list("inventory");
     items.sort((a, b) => a.name.localeCompare(b.name, "uk"));
     sendJson(res, 200, items.map(withLowFlag));
   });
 
   router.post("/api/inventory", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireInventoryAccess(req, res)) return;
     const body = await readJsonBody(req, 1.5 * 1024 * 1024); // room for a photo data: URL
     const data = cleanItem(body, null);
     if (!data.name) return sendJson(res, 400, { error: "invalid_input", message: "Вкажіть назву товару." });
@@ -64,7 +72,7 @@ module.exports = function registerInventoryRoutes(router) {
   });
 
   router.patch("/api/inventory/:id", async (req, res, params) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireInventoryAccess(req, res)) return;
     const existing = await store.get("inventory", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     const body = await readJsonBody(req, 1.5 * 1024 * 1024); // room for a photo data: URL
@@ -74,7 +82,7 @@ module.exports = function registerInventoryRoutes(router) {
   });
 
   router.delete("/api/inventory/:id", async (req, res, params) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireInventoryAccess(req, res)) return;
     const existing = await store.get("inventory", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     await store.remove("inventory", params.id);
@@ -86,7 +94,7 @@ module.exports = function registerInventoryRoutes(router) {
   // be tied to a job so you can see what chemical a given order consumed;
   // "restock" and "adjust" are stock-only and never carry a job.
   router.post("/api/inventory/:id/log", async (req, res, params) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireInventoryAccess(req, res)) return;
     const item = await store.get("inventory", params.id);
     if (!item) return sendJson(res, 404, { error: "not_found" });
 
@@ -137,7 +145,7 @@ module.exports = function registerInventoryRoutes(router) {
   // (?itemId=... / ?jobId=...), newest first. Powers both a per-item usage
   // history and a "what chemical did this job use" view.
   router.get("/api/inventory/logs", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireInventoryAccess(req, res)) return;
     let logs = await store.list("inventoryLogs");
     const { itemId, jobId } = req.query || {};
     if (itemId) logs = logs.filter((l) => l.itemId === itemId);

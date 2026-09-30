@@ -1,6 +1,19 @@
 const store = require("../lib/store");
-const { hashPassword, sanitizeUser, generateTelegramLinkCode, requireAuth, requireAdmin, requireOwner, normalizePermissions, PERMISSION_KEYS } = require("../lib/auth");
+const { hashPassword, sanitizeUser, generateTelegramLinkCode, requireAuth, requireAdmin, requireOwner, hasPermission, normalizePermissions, PERMISSION_KEYS } = require("../lib/auth");
 const { sendJson, readJsonBody } = require("../lib/http-utils");
+
+// The whole "Команда" tab (roster with management controls) is now
+// owner-granted via "viewTeam" — nobody sees it by default except the
+// owner. GET /api/users/roster below is a separate, deliberately open
+// endpoint (job assignment needs it) and is untouched by this.
+function requireTeamView(req, res) {
+  if (!requireAuth(req, res)) return false;
+  if (!hasPermission(req.user, "viewTeam")) {
+    sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до команди." });
+    return false;
+  }
+  return true;
+}
 
 module.exports = function registerUserRoutes(router) {
   // GET /api/users/roster — any authenticated user (not just admins) can
@@ -17,15 +30,18 @@ module.exports = function registerUserRoutes(router) {
     sendJson(res, 200, roster);
   });
 
-  // Every route below is admin-only: employees don't manage other accounts.
+  // Every route below needs the admin role AND the owner-granted
+  // "viewTeam" permission — employees don't manage other accounts, and
+  // now neither does an admin the owner hasn't opened this tab for.
 
   router.get("/api/users", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireTeamView(req, res)) return;
     sendJson(res, 200, (await store.list("users")).map(sanitizeUser));
   });
 
   router.post("/api/users", async (req, res) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewTeam")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до команди." });
     const body = await readJsonBody(req);
     const { username, password, name, role } = body || {};
     if (!username || !password || String(password).length < 8) {
@@ -48,6 +64,7 @@ module.exports = function registerUserRoutes(router) {
 
   router.patch("/api/users/:id", async (req, res, params) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewTeam")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до команди." });
     const existing = await store.get("users", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
 
@@ -112,6 +129,7 @@ module.exports = function registerUserRoutes(router) {
 
   router.delete("/api/users/:id", async (req, res, params) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewTeam")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до команди." });
     const existing = await store.get("users", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     if (existing.isOwner) {

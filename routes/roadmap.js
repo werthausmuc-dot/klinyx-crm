@@ -1,8 +1,19 @@
 const store = require("../lib/store");
-const { requireAuth, requireAdmin } = require("../lib/auth");
+const { requireAuth, requireAdmin, hasPermission } = require("../lib/auth");
 const { sendJson, readJsonBody } = require("../lib/http-utils");
 
 const STATUSES = ["backlog", "in_progress", "done"];
+
+// The whole "План розвитку" tab is now owner-granted, via "viewRoadmap" —
+// nobody sees it by default except the owner, admin or employee alike.
+function requireRoadmapView(req, res) {
+  if (!requireAuth(req, res)) return false;
+  if (!hasPermission(req.user, "viewRoadmap")) {
+    sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до плану розвитку." });
+    return false;
+  }
+  return true;
+}
 
 function clean(body, existing) {
   const data = {};
@@ -14,16 +25,16 @@ function clean(body, existing) {
 }
 
 module.exports = function registerRoadmapRoutes(router) {
-  // Anyone signed in can see the plan — it keeps the whole team aligned on
-  // what's shipped and what's next, not just admins.
   router.get("/api/roadmap", async (req, res) => {
-    if (!requireAuth(req, res)) return;
+    if (!requireRoadmapView(req, res)) return;
     sendJson(res, 200, await store.list("roadmap"));
   });
 
-  // Only admins curate the roadmap itself.
+  // Curating the roadmap still needs the admin role, on top of the tab
+  // itself being visible to this person.
   router.post("/api/roadmap", async (req, res) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewRoadmap")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до плану розвитку." });
     const body = await readJsonBody(req);
     const data = clean(body, null);
     if (!data.title) return sendJson(res, 400, { error: "invalid_input", message: "Вкажіть назву пункту." });
@@ -33,6 +44,7 @@ module.exports = function registerRoadmapRoutes(router) {
 
   router.patch("/api/roadmap/:id", async (req, res, params) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewRoadmap")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до плану розвитку." });
     const existing = await store.get("roadmap", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     const body = await readJsonBody(req);
@@ -42,6 +54,7 @@ module.exports = function registerRoadmapRoutes(router) {
 
   router.delete("/api/roadmap/:id", async (req, res, params) => {
     if (!requireAdmin(req, res)) return;
+    if (!hasPermission(req.user, "viewRoadmap")) return sendJson(res, 403, { error: "forbidden", message: "У вас немає доступу до плану розвитку." });
     const existing = await store.get("roadmap", params.id);
     if (!existing) return sendJson(res, 404, { error: "not_found" });
     await store.remove("roadmap", params.id);
