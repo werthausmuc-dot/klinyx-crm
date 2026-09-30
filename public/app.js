@@ -1688,6 +1688,7 @@
         (j.status === "cancelled" && j.cancelReason ? '<div class="meta" style="color:var(--danger); white-space:normal;">' + t("Причина: ") + autoTranslateHtml(j.cancelReason) + '</div>' : '') +
         '</div>' +
         '<div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">' +
+          (Number(j.price) > 0 ? '<div style="font-weight:700; font-family:\'Sora\',sans-serif; font-size:15px;">' + fmtMoney(j.price) + '</div>' : '') +
           '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span>' +
           '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? t("оплачено") : t("не оплачено")) + '</span>' +
           (j.status === "done" ? '<span class="pill ' + (invoiceForJob(j.id) ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (invoiceForJob(j.id) ? t("рахунок виставлено") : t("рахунок не виставлено")) + '</span>' : '') +
