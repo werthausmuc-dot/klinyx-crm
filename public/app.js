@@ -255,6 +255,7 @@
     "Збережено": "Gespeichert",
     "Вкажіть коректну кількість годин": "Geben Sie eine gültige Stundenzahl an",
     "Кількість замовлень": "Anzahl Aufträge",
+    "Кількість замовлень за ": "Anzahl Aufträge für ",
     "Баланс": "Saldo",
     "Власник": "Inhaber",
     "власник": "Inhaber",
@@ -637,6 +638,7 @@
       "Збережено": "تم الحفظ",
       "Вкажіть коректну кількість годин": "أدخل عدد ساعات صحيح",
       "Кількість замовлень": "عدد الطلبات",
+      "Кількість замовлень за ": "عدد الطلبات لشهر ",
       "Баланс": "الرصيد",
       "Власник": "المالك",
       "власник": "المالك",
@@ -1267,6 +1269,12 @@
 
     var jobs = jobsSorted();
     var todayS = todayStr();
+    // "Кількість замовлень" tracks whichever calendar month the task-calendar
+    // widget is currently showing (state.calYear/calMonth), same idea as the
+    // income tile's month option — so paging the calendar to October makes
+    // this tile show October's order count, not a lifetime total.
+    var calMr = monthRange(new Date(state.calYear, state.calMonth, 1));
+    var calMonthAllJobs = jobs.filter(function (j) { return j.date >= calMr.start && j.date <= calMr.end; });
     // "Цього тижня" means the calendar week (понеділок–неділя), not a
     // rolling 7 days from today — otherwise the count would jump around
     // depending on which day of the week "today" happens to be.
@@ -1284,7 +1292,9 @@
     var taskPeriod = taskCountByPeriod.hasOwnProperty(state.taskPeriod) ? state.taskPeriod : "week";
 
     document.getElementById("stat-clients").textContent = state.clients.size;
-    document.getElementById("stat-orders-count").textContent = jobs.length;
+    document.getElementById("stat-orders-count").textContent = calMonthAllJobs.length;
+    var ordersCountLabel = document.getElementById("stat-orders-count-label");
+    if (ordersCountLabel) ordersCountLabel.textContent = t("Кількість замовлень за ") + MONTHS[state.lang][state.calMonth].toLowerCase();
     document.getElementById("stat-week-jobs").textContent = taskCountByPeriod[taskPeriod];
     var taskLabel = document.getElementById("stat-task-label");
     if (taskLabel) taskLabel.textContent = t(taskLabelKey[taskPeriod]);
@@ -1326,7 +1336,6 @@
     // calMonth), not always the real-world current month, so it keeps
     // updating when the person pages the calendar forward/back; day and
     // week are always relative to today, matching the other dashboard tiles.
-    var calMr = monthRange(new Date(state.calYear, state.calMonth, 1));
     var calMonthJobsF = jobs.filter(function (j) { return j.status !== "cancelled" && j.date >= calMr.start && j.date <= calMr.end; });
     var todayJobsF = jobs.filter(function (j) { return j.status !== "cancelled" && j.date === todayS; });
     var incomeByPeriod = {
