@@ -134,6 +134,7 @@
     "Редагувати завдання": "Auftrag bearbeiten", "Нове завдання": "Neuer Auftrag",
     "Клієнт *": "Kunde *", "Дата *": "Datum *", "Час": "Uhrzeit", "Тип послуги": "Leistungsart",
     "Адреса об'єкта": "Adresse des Objekts", "Вартість, €": "Preis, €", "Виконавець": "Ausführende(r)",
+    "Тривалість, год": "Dauer, Std.", "Виконавці": "Ausführende",
     "— не призначено —": "— nicht zugewiesen —", " (адмін)": " (Admin)", " · без Telegram": " · ohne Telegram",
     "\"· без Telegram\" — сповіщення про призначення не дійде, доки людина не під'єднає бота.": "„· ohne Telegram“ — die Zuweisungs-Benachrichtigung kommt erst an, wenn die Person den Bot verbindet.",
     "Оплата": "Zahlung", "не повторюється": "wiederholt sich nicht",
@@ -280,6 +281,9 @@
     "Вкладка «План розвитку»": "Reiter „Entwicklungsplan“",
     "Вкладка «Замовлення»": "Reiter „Aufträge“",
     "Дозволи оновлено": "Berechtigungen aktualisiert",
+    "Ставка": "Satz", "Ставка оплати: ": "Lohnsatz: ", "Ставка, €/год": "Satz, €/Std.",
+    "Використовується, щоб порахувати оплату за завдання (ставка × тривалість у годинах) — саме цю суму бачить співробітник, а не вартість для клієнта.": "Wird verwendet, um die Bezahlung für einen Auftrag zu berechnen (Satz × Dauer in Stunden) — genau diesen Betrag sieht der Mitarbeiter, nicht den Preis für den Kunden.",
+    "Ставку оновлено": "Satz aktualisiert", "Оплата виконавцям: ": "Bezahlung für Ausführende: ",
     "Баланс: ": "Saldo: ",
     "Поточний баланс": "Aktueller Saldo",
     "Сума (+ нараховано, − виплачено)": "Betrag (+ zugerechnet, − ausgezahlt)",
@@ -460,6 +464,8 @@
       "Адреса об'єкта": "عنوان الموقع",
       "Вартість, €": "التكلفة، €",
       "Виконавець": "المنفذ",
+      "Тривалість, год": "المدة، ساعة",
+      "Виконавці": "المنفذون",
       "— не призначено —": "— غير مسند —",
       " (адмін)": " (مسؤول)",
       " · без Telegram": " · بدون تيليجرام",
@@ -666,6 +672,12 @@
       "Вкладка «План розвитку»": "تبويب «خطة التطوير»",
       "Вкладка «Замовлення»": "تبويب «الطلبات»",
       "Дозволи оновлено": "تم تحديث الصلاحيات",
+      "Ставка": "المعدل",
+      "Ставка оплати: ": "معدل الأجر: ",
+      "Ставка, €/год": "المعدل، €/ساعة",
+      "Використовується, щоб порахувати оплату за завдання (ставка × тривалість у годинах) — саме цю суму бачить співробітник, а не вартість для клієнта.": "يُستخدم لحساب أجر المهمة (المعدل × المدة بالساعات) — هذا المبلغ بالضبط يراه الموظف، وليس السعر الذي يدفعه العميل.",
+      "Ставку оновлено": "تم تحديث المعدل",
+      "Оплата виконавцям: ": "أجر المنفذين: ",
       "Баланс: ": "الرصيد: ",
       "Поточний баланс": "الرصيد الحالي",
       "Сума (+ нараховано, − виплачено)": "المبلغ (+ مستحق، − مدفوع)",
@@ -1166,8 +1178,17 @@
       state.me && state.me.role === "admin" ? api("GET", "/api/users") : Promise.resolve(null),
       api("GET", "/api/users/roster"),
       state.me && state.me.role === "admin" ? api("GET", "/api/inventory") : Promise.resolve(null),
-      api("GET", "/api/roadmap"),
-      api("GET", "/api/platforms"),
+      // These two are permission-gated server-side for every caller, not
+      // just non-admins (routes/roadmap.js and routes/platforms.js both
+      // require "viewRoadmap"/"viewOrders" even for GET) — unlike the
+      // other conditional calls above, which only need the admin *role*.
+      // Fetching them unconditionally meant any employee or admin who
+      // hadn't been granted those two permissions got a 403 here on every
+      // loadAll() call, which rejected this whole Promise.all and silently
+      // stopped their entire dashboard (jobs included) from ever loading
+      // or refreshing. Gate client-side too, so this stays a plain skip.
+      hasPerm("viewRoadmap") ? api("GET", "/api/roadmap") : Promise.resolve(null),
+      hasPerm("viewOrders") ? api("GET", "/api/platforms") : Promise.resolve(null),
       state.me && state.me.role === "admin" ? api("GET", "/api/dayplans") : Promise.resolve(null),
       api("GET", "/api/timeoff"),
       api("GET", "/api/workhours"),
@@ -1793,6 +1814,42 @@
     var u = state.roster.find(function (x) { return x.id === id; });
     return u ? u.name : "";
   }
+  // A job can be assigned to a whole crew now, not just one person, so
+  // `assignedTo` is always treated as an array — normalized here in case
+  // anything still hands us the old single-id shape (a string, or null).
+  function assigneeIds(job) {
+    var a = job && job.assignedTo;
+    if (Array.isArray(a)) return a.filter(Boolean);
+    if (typeof a === "string" && a) return [a];
+    return [];
+  }
+  function assigneeNames(job) {
+    return assigneeIds(job).map(assigneeName).filter(Boolean).join(", ");
+  }
+  // What the CURRENT user earns for a job assigned to them: their own
+  // hourly rate (from their own /auth/me data — never another person's,
+  // which the frontend never receives unless the viewer is the owner)
+  // times the job's estimated hours. Null if either piece is missing.
+  function myJobPay(job) {
+    var rate = state.me && typeof state.me.hourlyRate === "number" ? state.me.hourlyRate : null;
+    var hours = typeof job.hours === "number" ? job.hours : null;
+    if (rate == null || !hours) return null;
+    return Math.round(rate * hours * 100) / 100;
+  }
+  // The money figure shown next to a job in the agenda: the full
+  // client-facing price for whoever can see earnings, or — for a job
+  // assigned to the current user — just their own computed payout, never
+  // both and never the price as a fallback. Someone without "viewEarnings"
+  // looking at a job that isn't theirs sees no figure at all.
+  function agendaMoneyLine(j) {
+    var amount = null;
+    if (hasPerm("viewEarnings")) {
+      amount = Number(j.price) > 0 ? Number(j.price) : null;
+    } else if (state.me && assigneeIds(j).indexOf(state.me.id) !== -1) {
+      amount = myJobPay(j);
+    }
+    return amount ? '<div style="font-weight:700; font-family:\'Sora\',sans-serif; font-size:15px;">' + fmtMoney(amount) + '</div>' : '';
+  }
 
   function renderAgenda() {
     var listEl = document.getElementById("agenda-list");
@@ -1818,11 +1875,11 @@
       return '<div class="agenda-item clickable" data-job="' + j.id + '" style="cursor:pointer;">' +
         '<div class="agenda-date">' + fmtDateHuman(j.date) + (j.time ? '<b>' + j.time + '</b>' : "") + '</div>' +
         '<div class="agenda-main"><div class="title">' + repeatIcon + escapeHtml(clientName(j.clientId)) + '</div>' +
-        '<div class="meta">' + escapeHtml(j.service ? t(j.service) : "") + (j.address ? " · " + escapeHtml(j.address) : "") + (assigneeName(j.assignedTo) ? " · 👤 " + escapeHtml(assigneeName(j.assignedTo)) : "") + '</div>' +
+        '<div class="meta">' + escapeHtml(j.service ? t(j.service) : "") + (j.address ? " · " + escapeHtml(j.address) : "") + (assigneeNames(j) ? " · 👤 " + escapeHtml(assigneeNames(j)) : "") + '</div>' +
         (j.status === "cancelled" && j.cancelReason ? '<div class="meta" style="color:var(--danger); white-space:normal;">' + t("Причина: ") + autoTranslateHtml(j.cancelReason) + '</div>' : '') +
         '</div>' +
         '<div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">' +
-          (Number(j.price) > 0 ? '<div style="font-weight:700; font-family:\'Sora\',sans-serif; font-size:15px;">' + fmtMoney(j.price) + '</div>' : '') +
+          agendaMoneyLine(j) +
           '<span class="pill ' + j.status + '"><span class="pill-dot"></span>' + statusLabelJob(j.status) + '</span>' +
           '<span class="pill ' + (j.paid ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (j.paid ? t("оплачено") : t("не оплачено")) + '</span>' +
           (j.status === "done" ? '<span class="pill ' + (invoiceForJob(j.id) ? "paid" : "unpaid") + '"><span class="pill-dot"></span>' + (invoiceForJob(j.id) ? t("рахунок виставлено") : t("рахунок не виставлено")) + '</span>' : '') +
@@ -2064,6 +2121,7 @@
           '<button class="btn btn-sm btn-ghost" data-toggle-active="' + u.id + '">' + (u.active ? t("Вимкнути") : t("Увімкнути")) + '</button>';
         if (state.me.isOwner) {
           actions += '<button class="btn btn-sm btn-ghost" data-open-perms="' + u.id + '">' + t("Дозволи") + '</button>';
+          actions += '<button class="btn btn-sm btn-ghost" data-open-rate="' + u.id + '">' + t("Ставка") + '</button>';
         }
         if (u.id !== state.me.id) {
           actions += '<button class="icon-btn" data-del-user="' + u.id + '" title="' + t("Видалити") + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button>';
@@ -2121,6 +2179,9 @@
     });
     tbody.querySelectorAll("[data-open-perms]").forEach(function (btn) {
       btn.addEventListener("click", function () { openPermissionsModal(btn.getAttribute("data-open-perms")); });
+    });
+    tbody.querySelectorAll("[data-open-rate]").forEach(function (btn) {
+      btn.addEventListener("click", function () { openRateModal(btn.getAttribute("data-open-rate")); });
     });
     tbody.querySelectorAll("[data-open-balance]").forEach(function (btn) {
       btn.addEventListener("click", function () { openBalanceModal(btn.getAttribute("data-open-balance")); });
@@ -2711,9 +2772,16 @@
     var j = id ? state.jobs.get(id) : {
       clientId: presets.clientId || (clientsList()[0] && clientsList()[0].id) || "",
       date: presets.date || state.selectedDay || todayStr(),
-      time: "10:00", service: SERVICE_TYPES[0], address: "", price: "", status: "scheduled", notes: "", assignedTo: null,
+      time: "10:00", service: SERVICE_TYPES[0], address: "", price: "", hours: "", status: "scheduled", notes: "", assignedTo: [],
       paid: false, recurrence: null, cancelReason: ""
     };
+    // The client-facing price is what the owner earns from a job — hidden
+    // from anyone without "viewEarnings" so an employee editing their own
+    // task never sees it, only the "Триваність, год" field needed (along
+    // with their own hourly rate, set on their profile) to work out what
+    // THEY get paid for it. See agendaMoneyLine()/workerPayFor() for the
+    // other half of this.
+    var canSeePrice = hasPerm("viewEarnings");
     var root = document.getElementById("modal-root");
     root.innerHTML =
       '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
@@ -2728,22 +2796,29 @@
             SERVICE_TYPES.map(function (s) { return '<option value="' + escapeHtml(s) + '"' + (j.service === s ? " selected" : "") + '>' + escapeHtml(t(s)) + '</option>'; }).join("") + '</select></div>' +
           '<div class="field"><label>' + t("Адреса об'єкта") + '</label><input type="text" id="f-address" value="' + escapeHtml(j.address) + '"></div>' +
           '<div class="field-row">' +
-            '<div class="field"><label>' + t("Вартість, €") + '</label><input type="number" id="f-price" value="' + escapeHtml(j.price) + '" min="0" step="1"></div>' +
-            '<div class="field"><label>' + t("Статус") + '</label><select id="f-status">' +
-              ["scheduled", "done", "cancelled"].map(function (s) { return '<option value="' + s + '"' + (j.status === s ? " selected" : "") + '>' + statusLabelJob(s) + '</option>'; }).join("") + '</select></div></div>' +
+            (canSeePrice ? '<div class="field"><label>' + t("Вартість, €") + '</label><input type="number" id="f-price" value="' + escapeHtml(j.price) + '" min="0" step="1"></div>' : '') +
+            '<div class="field"><label>' + t("Тривалість, год") + '</label><input type="number" id="f-hours" value="' + escapeHtml(j.hours != null ? j.hours : "") + '" min="0" step="0.5"></div>' +
+          '</div>' +
+          '<div class="field"><label>' + t("Статус") + '</label><select id="f-status">' +
+              ["scheduled", "done", "cancelled"].map(function (s) { return '<option value="' + s + '"' + (j.status === s ? " selected" : "") + '>' + statusLabelJob(s) + '</option>'; }).join("") + '</select></div>' +
           '<div class="field" id="f-cancel-reason-wrap" style="' + (j.status === "cancelled" ? '' : 'display:none;') + '">' +
             '<label>' + t("Причина відмови") + '</label>' +
             '<textarea id="f-cancel-reason" placeholder="' + t("Напр. клієнт відмовився, поганий стан об'єкта...") + '">' + escapeHtml(j.cancelReason || "") + '</textarea>' +
           '</div>' +
-          '<div class="field"><label>' + t("Виконавець") + '</label><select id="f-assignee"><option value="">' + t("— не призначено —") + '</option>' +
-            state.roster.map(function (u) {
+          '<div class="field"><label>' + t("Виконавці") + '</label>' +
+          '<div class="checklist-box" id="f-assignees">' +
+            (state.roster.length ? state.roster.map(function (u) {
               var tag = (u.role === "admin" ? t(" (адмін)") : "") + (u.telegramLinked ? " · Telegram ✓" : t(" · без Telegram"));
-              return '<option value="' + u.id + '"' + (j.assignedTo === u.id ? " selected" : "") + '>' + escapeHtml(u.name) + tag + '</option>';
-            }).join("") +
-          '</select>' +
+              var checked = assigneeIds(j).indexOf(u.id) !== -1 ? " checked" : "";
+              return '<label class="checkbox-field"><input type="checkbox" value="' + u.id + '"' + checked + '> ' + escapeHtml(u.name) + tag + '</label>';
+            }).join("") : '<span class="auth-sub">' + t("— не призначено —") + '</span>') +
+          '</div>' +
           '<p class="auth-sub" style="margin-top:6px;">' + t("\"· без Telegram\" — сповіщення про призначення не дійде, доки людина не під'єднає бота.") + '</p></div>' +
           '<div class="field" id="f-assignee-timeoff-warn" style="display:none;">' +
             '<p class="auth-sub" style="color:var(--warning); white-space:normal;">⚠ ' + t("У виконавця цього дня вихідний.") + '</p>' +
+          '</div>' +
+          '<div class="field" id="f-worker-pay-wrap" style="display:none;">' +
+            '<p class="auth-sub" style="white-space:normal;">💶 <span id="f-worker-pay-text"></span></p>' +
           '</div>' +
           '<div class="field-row">' +
             '<div class="field"><label>' + t("Оплата") + '</label><select id="f-paid">' +
@@ -2781,13 +2856,19 @@
         time: document.getElementById("f-time").value,
         service: document.getElementById("f-service").value,
         address: document.getElementById("f-address").value.trim(),
-        price: document.getElementById("f-price").value ? Number(document.getElementById("f-price").value) : null,
+        hours: document.getElementById("f-hours").value ? Number(document.getElementById("f-hours").value) : null,
         status: status,
         cancelReason: status === "cancelled" ? cancelReason : "",
         notes: document.getElementById("f-notes").value.trim(),
-        assignedTo: document.getElementById("f-assignee").value || null,
+        assignedTo: selectedAssigneeIds(),
         paid: document.getElementById("f-paid").value === "true"
       };
+      // The price field only exists in the DOM for someone with
+      // "viewEarnings" — leaving the key out entirely (rather than sending
+      // null) means saving other fields never blanks out a price an
+      // employee without that permission simply can't see.
+      var priceEl = document.getElementById("f-price");
+      if (priceEl) data.price = priceEl.value ? Number(priceEl.value) : null;
       var recurFreq = document.getElementById("f-recur-freq").value;
       data.recurrence = recurFreq ? { freq: recurFreq, until: document.getElementById("f-recur-until").value || null } : null;
       var req = id ? api("PATCH", "/api/jobs/" + id, data) : api("POST", "/api/jobs", data);
@@ -2816,15 +2897,52 @@
     document.getElementById("f-status").addEventListener("change", function (e) {
       document.getElementById("f-cancel-reason-wrap").style.display = e.target.value === "cancelled" ? "" : "none";
     });
+    function selectedAssigneeIds() {
+      return Array.from(document.querySelectorAll("#f-assignees input[type=checkbox]:checked")).map(function (cb) { return cb.value; });
+    }
     function updateAssigneeTimeoffWarning() {
-      var assigneeId = document.getElementById("f-assignee").value;
+      var ids = selectedAssigneeIds();
       var date = document.getElementById("f-date").value;
-      var warn = assigneeId && date && isOffDay(assigneeId, date);
+      var warn = date && ids.some(function (uid) { return isOffDay(uid, date); });
       document.getElementById("f-assignee-timeoff-warn").style.display = warn ? "" : "none";
     }
-    document.getElementById("f-assignee").addEventListener("change", updateAssigneeTimeoffWarning);
+    // A per-assignee pay preview: each selected person's OWN hourly rate ×
+    // the hours field above. The frontend only ever has a rate to work
+    // with for the current user themself (their own /auth/me data) and,
+    // if the viewer is the owner, every other employee's rate (see
+    // GET /api/users in routes/users.js — that's stripped out for anyone
+    // else). So a plain employee opening this only ever sees their own
+    // line here, never a colleague's.
+    function updateWorkerPayReadout() {
+      var wrap = document.getElementById("f-worker-pay-wrap");
+      var textEl = document.getElementById("f-worker-pay-text");
+      if (!wrap || !textEl) return;
+      var ids = selectedAssigneeIds();
+      var hoursEl = document.getElementById("f-hours");
+      var hours = hoursEl && hoursEl.value ? Number(hoursEl.value) : null;
+      if (!ids.length || !hours) { wrap.style.display = "none"; return; }
+      var lines = [];
+      ids.forEach(function (uid) {
+        var rate = null;
+        if (state.me && uid === state.me.id) {
+          rate = typeof state.me.hourlyRate === "number" ? state.me.hourlyRate : null;
+        } else if (state.users) {
+          var u = state.users.find(function (x) { return x.id === uid; });
+          rate = u && typeof u.hourlyRate === "number" ? u.hourlyRate : null;
+        }
+        if (rate != null) lines.push(assigneeName(uid) + ": " + fmtMoney(Math.round(rate * hours * 100) / 100));
+      });
+      if (!lines.length) { wrap.style.display = "none"; return; }
+      textEl.textContent = t("Оплата виконавцям: ") + lines.join(", ");
+      wrap.style.display = "";
+    }
+    document.querySelectorAll("#f-assignees input[type=checkbox]").forEach(function (cb) {
+      cb.addEventListener("change", function () { updateAssigneeTimeoffWarning(); updateWorkerPayReadout(); });
+    });
     document.getElementById("f-date").addEventListener("change", updateAssigneeTimeoffWarning);
+    document.getElementById("f-hours").addEventListener("input", updateWorkerPayReadout);
     updateAssigneeTimeoffWarning();
+    updateWorkerPayReadout();
   }
 
   /* ============ modals: invoice ============ */
@@ -3185,6 +3303,35 @@
       document.querySelectorAll("[data-perm]").forEach(function (cb) { patch[cb.getAttribute("data-perm")] = cb.checked; });
       api("PATCH", "/api/users/" + userId, { permissions: patch }).then(function () {
         toast(t("Дозволи оновлено")); closeOverlay(); loadAll();
+      }).catch(function (err) { toast(err.message, true); });
+    });
+  }
+
+  // Owner-only: the hourly wage used to work out what this person gets
+  // paid for a job (rate × the job's "Тривалість, год") — shown to them
+  // (in the CRM and in their Telegram notification) instead of the
+  // client-facing price. See workerPayFor()/agendaMoneyLine() and
+  // lib/notify.js for where this rate actually gets used.
+  function openRateModal(userId) {
+    var u = state.users.find(function (x) { return x.id === userId; });
+    if (!u) return;
+    var root = document.getElementById("modal-root");
+    root.innerHTML =
+      '<div class="modal-backdrop" id="ov-backdrop"><div class="modal">' +
+        '<div class="modal-head"><h3>' + t("Ставка оплати: ") + escapeHtml(u.name) + '</h3>' +
+          '<button class="icon-btn" id="ov-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+        '<div class="modal-body">' +
+          '<div class="field"><label>' + t("Ставка, €/год") + '</label><input type="number" id="f-rate" value="' + (typeof u.hourlyRate === "number" ? u.hourlyRate : "") + '" min="0" step="0.5"></div>' +
+          '<p class="auth-sub" style="white-space:normal;">' + t("Використовується, щоб порахувати оплату за завдання (ставка × тривалість у годинах) — саме цю суму бачить співробітник, а не вартість для клієнта.") + '</p>' +
+        '</div>' +
+        '<div class="modal-foot"><span></span><button class="btn btn-primary" id="ov-save">' + t("Зберегти") + '</button></div></div></div>';
+
+    document.getElementById("ov-close").addEventListener("click", closeOverlay);
+    document.getElementById("ov-backdrop").addEventListener("click", function (e) { if (e.target.id === "ov-backdrop") closeOverlay(); });
+    document.getElementById("ov-save").addEventListener("click", function () {
+      var val = document.getElementById("f-rate").value;
+      api("PATCH", "/api/users/" + userId, { hourlyRate: val ? Number(val) : null }).then(function () {
+        toast(t("Ставку оновлено")); closeOverlay(); loadAll();
       }).catch(function (err) { toast(err.message, true); });
     });
   }
