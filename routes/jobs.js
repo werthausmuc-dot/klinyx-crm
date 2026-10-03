@@ -244,6 +244,11 @@ module.exports = function registerJobRoutes(router) {
     router.get("/api/jobs", async (req, res) => {
           if (!requireAuth(req, res)) return;
           await ensureRecurringInstances();
+          // Same lazy, no-cron approach as the recurring-job catch-up above
+          // (see ensureRecurringInstances's comment): check on every poll
+          // whether any job just crossed into its 2-day/1-day reminder
+          // window and send it. Best-effort — never blocks this request.
+          notify.ensureJobReminders().catch(() => {});
           const jobs = await store.list("jobs");
           // Auto-invoicing runs against the FULL list, before the
           // employee-visibility filter below — it's a company-wide
