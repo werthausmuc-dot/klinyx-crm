@@ -250,6 +250,9 @@
     "год.": "Std.",
     "г": "Std",
     "Відпрацьовано за місяць: ": "Geleistet in diesem Monat: ",
+    "Заплановані вихідні": "Geplante freie Tage",
+    "Весь день": "Ganzer Tag",
+    "Цього місяця запланованих вихідних немає.": "In diesem Monat sind keine freien Tage geplant.",
     "Вкажіть і початок, і завершення": "Geben Sie sowohl Anfang als auch Ende an",
     "Вкажіть час початку і завершення": "Geben Sie Anfangs- und Endzeit an",
     "Збережено": "Gespeichert",
@@ -633,6 +636,9 @@
       "год.": "ساعة",
       "г": "س",
       "Відпрацьовано за місяць: ": "تم العمل هذا الشهر: ",
+      "Заплановані вихідні": "الإجازات المجدولة",
+      "Весь день": "طوال اليوم",
+      "Цього місяця запланованих вихідних немає.": "لا توجد إجازات مجدولة هذا الشهر.",
       "Вкажіть і початок, і завершення": "حدد وقت البداية والنهاية",
       "Вкажіть час початку і завершення": "حدد وقت البدء والانتهاء",
       "Збережено": "تم الحفظ",
@@ -838,7 +844,10 @@
     timeoffCalYear: new Date().getFullYear(),
     timeoffCalMonth: new Date().getMonth(),
     timeoffWorkerId: null,
-    timeoffSelectedDay: null
+    timeoffSelectedDay: null,
+    // True while the person has typed into the off-hours/worked-hours
+    // fields but not saved yet — see renderTimeoffHoursForm().
+    timeoffHoursDirty: false
   };
 
   function todayStr() { return fmtDate(new Date()); }
@@ -1539,6 +1548,13 @@
     document.querySelectorAll("#timeoff-cal-grid .cal-cell").forEach(function (el) {
       el.addEventListener("click", function () { toggleTimeoffDay(el.getAttribute("data-date")); });
     });
+
+    // Every path that can change the calendar's data (toggling a day,
+    // saving hours, paging months, switching worker, the background poll)
+    // calls renderTimeoffCalendar(), so refreshing the side widget here
+    // keeps it in sync everywhere without having to thread a call through
+    // each of those call sites separately.
+    renderTimeoffScheduleList();
   }
 
   function renderTimeoffDayList() {
@@ -1554,7 +1570,7 @@
         var rec = offRecordFor(u.id, day);
         var label = rec && rec.from && rec.to ? t("Вихідний") + " " + rec.from + "–" + rec.to : t("Вихідний");
         return '<div class="job-row"><div class="agenda-main"><div class="title">' + escapeHtml(u.name) + '</div></div>' +
-          '<span class="pill unpaid"><span class="pill-dot"></span>' + escapeHtml(label) + '</span></div>';
+          '<span class="pill off"><span class="pill-dot"></span>' + escapeHtml(label) + '</span></div>';
       }));
     }
     var worked = state.roster
@@ -1574,10 +1590,39 @@
     var day = state.timeoffSelectedDay || todayStr();
     var workerId = state.timeoffWorkerId;
     var rec = offRecordFor(workerId, day);
-    document.getElementById("timeoff-hours-from").value = rec && rec.from ? rec.from : "";
-    document.getElementById("timeoff-hours-to").value = rec && rec.to ? rec.to : "";
-    var hours = workhoursFor(workerId, day);
-    document.getElementById("workhours-input").value = hours ? hours : "";
+    // The background poll (every 20s) re-renders this view via render(),
+    // which used to blindly overwrite these fields from server state —
+    // wiping out a time range the person had started typing but hadn't
+    // saved yet, which looked exactly like "saving doesn't work". Skip the
+    // overwrite while they have an unsaved edit in progress; the fields
+    // resync as soon as they save, clear, or move to a different day.
+    if (!state.timeoffHoursDirty) {
+      document.getElementById("timeoff-hours-from").value = rec && rec.from ? rec.from : "";
+      document.getElementById("timeoff-hours-to").value = rec && rec.to ? rec.to : "";
+      var hours = workhoursFor(workerId, day);
+      document.getElementById("workhours-input").value = hours ? hours : "";
+    }
+  }
+
+  function renderTimeoffScheduleList() {
+    var listEl = document.getElementById("timeoff-schedule-list");
+    if (!listEl) return;
+    var prefix = state.timeoffCalYear + "-" + pad2(state.timeoffCalMonth + 1);
+    var showOthers = canBrowseOthersSchedule();
+    var entries = timeoffList()
+      .filter(function (o) { return o.date.indexOf(prefix) === 0 && (showOthers || o.userId === state.timeoffWorkerId); })
+      .sort(function (a, b) { return a.date.localeCompare(b.date); });
+    if (!entries.length) {
+      listEl.innerHTML = '<div class="empty-note">' + t("Цього місяця запланованих вихідних немає.") + '</div>';
+      return;
+    }
+    listEl.innerHTML = entries.map(function (o) {
+      var worker = state.roster.find(function (u) { return u.id === o.userId; });
+      var namePrefix = showOthers && worker ? escapeHtml(worker.name) + " · " : "";
+      var hours = o.from && o.to ? o.from + "–" + o.to : t("Весь день");
+      return '<div class="job-row"><div class="agenda-main"><div class="title">' + namePrefix + fmtDateHuman(o.date) + '</div></div>' +
+        '<span class="pill off"><span class="pill-dot"></span>' + escapeHtml(hours) + '</span></div>';
+    }).join("");
   }
 
   function renderTimeoffMonthSummary() {
@@ -1593,6 +1638,7 @@
   function toggleTimeoffDay(dateStr) {
     var workerId = state.timeoffWorkerId;
     state.timeoffSelectedDay = dateStr;
+    state.timeoffHoursDirty = false;
     api("POST", "/api/timeoff/toggle", { date: dateStr, userId: workerId }).then(function (res) {
       if (res && res.removed) {
         state.timeoff.delete(res.id);
@@ -1614,8 +1660,10 @@
     if (!from && !to) { toast(t("Вкажіть час початку і завершення"), true); return; }
     api("POST", "/api/timeoff/hours", { date: day, userId: workerId, from: from, to: to }).then(function (res) {
       if (res && res.id) state.timeoff.set(res.id, res);
+      state.timeoffHoursDirty = false;
       renderTimeoffCalendar();
       renderTimeoffDayList();
+      renderTimeoffHoursForm();
       toast(t("Збережено"));
     }).catch(function (err) { toast(err.message, true); });
   }
@@ -1624,6 +1672,7 @@
     var workerId = state.timeoffWorkerId;
     var day = state.timeoffSelectedDay || todayStr();
     var rec = offRecordFor(workerId, day);
+    state.timeoffHoursDirty = false;
     if (!rec) { renderTimeoffHoursForm(); return; }
     api("DELETE", "/api/timeoff/" + rec.id).then(function () {
       state.timeoff.delete(rec.id);
@@ -1645,8 +1694,10 @@
       } else if (res && res.id) {
         state.workhours.set(res.id, res);
       }
+      state.timeoffHoursDirty = false;
       renderTimeoffCalendar();
       renderTimeoffDayList();
+      renderTimeoffHoursForm();
       renderTimeoffMonthSummary();
       toast(t("Збережено"));
     }).catch(function (err) { toast(err.message, true); });
@@ -3296,11 +3347,18 @@
   document.getElementById("timeoff-worker-select").addEventListener("change", function (e) {
     state.timeoffWorkerId = e.target.value;
     state.timeoffSelectedDay = null;
+    state.timeoffHoursDirty = false;
     renderTimeoff();
   });
   document.getElementById("timeoff-hours-save").addEventListener("click", saveTimeoffHours);
   document.getElementById("timeoff-hours-clear").addEventListener("click", clearTimeoffHours);
   document.getElementById("workhours-save").addEventListener("click", saveWorkedHours);
+  // Mark the hours mini-form "dirty" the moment the person starts typing,
+  // so the 20s background poll (loadAll -> render -> renderTimeoffHoursForm)
+  // doesn't overwrite an edit they haven't saved yet.
+  ["timeoff-hours-from", "timeoff-hours-to", "workhours-input"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", function () { state.timeoffHoursDirty = true; });
+  });
 
   document.getElementById("client-search").addEventListener("input", function (e) { state.clientQuery = e.target.value; renderClients(); });
   document.querySelectorAll("#view-clients .filter-chip").forEach(function (chip) {
