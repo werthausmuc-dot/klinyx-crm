@@ -6,6 +6,25 @@ const notify = require("../lib/notify");
 const STATUSES = ["scheduled", "done", "cancelled"];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// `assignedTo` is always an array going forward (see clean() below), but
+// stay defensive for any older record that still has the pre-migration
+// shape (a single id string, or null) and slipped through unnormalized.
+function assigneeIds(job) {
+    const a = job && job.assignedTo;
+    if (Array.isArray(a)) return a.filter(Boolean);
+    if (typeof a === "string" && a) return [a];
+    return [];
+}
+
+// A plain employee only ever gets to see/touch their OWN assigned jobs —
+// not the whole company's client list, addresses and schedule. Owners and
+// admins (who do day-to-day dispatch/coordination) keep full visibility,
+// matching how every other admin-only view in this app already works.
+function canSeeJob(user, job) {
+    if (user.isOwner || user.role === "admin") return true;
+    return assigneeIds(job).indexOf(user.id) !== -1;
+}
+
 // ---- Крок 4: повторювані завдання ----
 // No server-side cron (Render's free plan sleeps the app, so a scheduled
 // job would just never fire). Instead, occurrences are generated lazily —
@@ -226,8 +245,15 @@ module.exports = function registerJobRoutes(router) {
           if (!requireAuth(req, res)) return;
           await ensureRecurringInstances();
           const jobs = await store.list("jobs");
+          // Auto-invoicing runs against the FULL list, before the
+          // employee-visibility filter below — it's a company-wide
+          // housekeeping step, not something that should depend on who
+          // happened to trigger this particular GET.
           await ensureInvoicesForDoneJobs(jobs);
-          sendJson(res, 200, jobs);
+          const visible = (req.user.isOwner || req.user.role === "admin")
+                ? jobs
+                : jobs.filter((j) => canSeeJob(req.user, j));
+          sendJson(res, 200, visible);
     });
 
     router.post("/api/jobs", async (req, res) => {
@@ -248,6 +274,9 @@ module.exports = function registerJobRoutes(router) {
           if (!requireAuth(req, res)) return;
           const existing = await store.get("jobs", params.id);
           if (!existing) return sendJson(res, 404, { error: "not_found" });
+          if (!canSeeJob(req.user, existing)) {
+                return sendJson(res, 403, { error: "forbidden", message: "Це завдання вам не призначено." });
+          }
           const body = await readJsonBody(req);
           const patch = clean(body, existing);
           if (patch.clientId && !(await store.get("clients", patch.clientId))) {
@@ -263,6 +292,9 @@ module.exports = function registerJobRoutes(router) {
           if (!requireAuth(req, res)) return;
           const existing = await store.get("jobs", params.id);
           if (!existing) return sendJson(res, 404, { error: "not_found" });
+          if (!canSeeJob(req.user, existing)) {
+                return sendJson(res, 403, { error: "forbidden", message: "Це завдання вам не призначено." });
+          }
           // Deleting one occurrence of a recurring series: if we don't record
           // which date was removed, the lazy catch-up generator in
           // ensureRecurringInstances() can mistake the now-later "last date"
