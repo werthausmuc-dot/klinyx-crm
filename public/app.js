@@ -13,6 +13,12 @@
     "Інше"
   ];
   var UNITS = ["л", "кг", "шт", "уп"];
+  // How a client can pay for a job sourced from a given platform (set per
+  // platform in "Замовлення", picked per job in the job modal) — drives
+  // both the payment-method dropdown on a job and the automatic
+  // platform-balance ledger entry it posts once that job is done.
+  var PAYMENT_METHODS = ["invoice", "cash", "card"];
+  var PAYMENT_METHOD_LABELS = { invoice: "Рахунок", cash: "Готівка", card: "Картка" };
   var DOW = {
     uk: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"],
     de: ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"],
@@ -284,6 +290,19 @@
     "Ставка": "Satz", "Ставка оплати: ": "Lohnsatz: ", "Ставка, €/год": "Satz, €/Std.",
     "Використовується, щоб порахувати оплату за завдання (ставка × тривалість у годинах) — саме цю суму бачить співробітник, а не вартість для клієнта.": "Wird verwendet, um die Bezahlung für einen Auftrag zu berechnen (Satz × Dauer in Stunden) — genau diesen Betrag sieht der Mitarbeiter, nicht den Preis für den Kunden.",
     "Ставку оновлено": "Satz aktualisiert", "Оплата виконавцям: ": "Bezahlung für Ausführende: ",
+    "Способи оплати на цій платформі": "Zahlungsarten auf dieser Plattform",
+    "Визначає, які способи оплати можна вибрати для замовлення з цієї платформи.": "Bestimmt, welche Zahlungsarten für einen Auftrag von dieser Plattform wählbar sind.",
+    "Рахунок": "Rechnung", "Готівка": "Bargeld", "Картка": "Karte",
+    "Баланс з платформою": "Saldo mit der Plattform",
+    "Сума (+ винна платформа, − винні ви)": "Betrag (+ Plattform schuldet, − Sie schulden)",
+    "напр. виплата, коригування": "z.B. Auszahlung, Korrektur",
+    "з завдання": "aus Auftrag",
+    "Платформа замовлення": "Auftragsplattform",
+    "— без платформи —": "— ohne Plattform —",
+    "Спосіб оплати": "Zahlungsart",
+    "Комісія платформи за це замовлення, €": "Plattformprovision für diesen Auftrag, €",
+    "За рахунком: з платформи вам належить (вартість − комісія). За готівку/картку: ви лишаєте собі комісію, вона мінусується з балансу платформи.": "Per Rechnung: von der Plattform steht Ihnen (Preis − Provision) zu. Bar/Karte: Sie behalten die Provision selbst, sie wird vom Plattformsaldo abgezogen.",
+    "— для цієї платформи не налаштовано —": "— für diese Plattform nicht konfiguriert —",
     "Баланс: ": "Saldo: ",
     "Поточний баланс": "Aktueller Saldo",
     "Сума (+ нараховано, − виплачено)": "Betrag (+ zugerechnet, − ausgezahlt)",
@@ -678,6 +697,19 @@
       "Використовується, щоб порахувати оплату за завдання (ставка × тривалість у годинах) — саме цю суму бачить співробітник, а не вартість для клієнта.": "يُستخدم لحساب أجر المهمة (المعدل × المدة بالساعات) — هذا المبلغ بالضبط يراه الموظف، وليس السعر الذي يدفعه العميل.",
       "Ставку оновлено": "تم تحديث المعدل",
       "Оплата виконавцям: ": "أجر المنفذين: ",
+      "Способи оплати на цій платформі": "طرق الدفع على هذه المنصة",
+      "Визначає, які способи оплати можна вибрати для замовлення з цієї платформи.": "يحدد طرق الدفع التي يمكن اختيارها لطلب من هذه المنصة.",
+      "Рахунок": "فاتورة", "Готівка": "نقدًا", "Картка": "بطاقة",
+      "Баланс з платформою": "الرصيد مع المنصة",
+      "Сума (+ винна платформа, − винні ви)": "المبلغ (+ المنصة مدينة، − أنت مدين)",
+      "напр. виплата, коригування": "مثال: دفعة، تعديل",
+      "з завдання": "من المهمة",
+      "Платформа замовлення": "منصة الطلب",
+      "— без платформи —": "— بدون منصة —",
+      "Спосіб оплати": "طريقة الدفع",
+      "Комісія платформи за це замовлення, €": "عمولة المنصة لهذا الطلب، €",
+      "За рахунком: з платформи вам належить (вартість − комісія). За готівку/картку: ви лишаєте собі комісію, вона мінусується з балансу платформи.": "عبر الفاتورة: يحق لك من المنصة (السعر − العمولة). نقدًا/بطاقة: تحتفظ بالعمولة لنفسك، وتُخصم من رصيد المنصة.",
+      "— для цієї платформи не налаштовано —": "— غير مُعدّ لهذه المنصة —",
       "Баланс: ": "الرصيد: ",
       "Поточний баланс": "الرصيد الحالي",
       "Сума (+ нараховано, − виплачено)": "المبلغ (+ مستحق، − مدفوع)",
@@ -839,6 +871,7 @@
     timeoff: new Map(),
     workhours: new Map(),
     balances: new Map(),
+    platformBalances: new Map(),
     users: [],
     roster: [],
     telegram: null,
@@ -869,6 +902,7 @@
   function hasPerm(key) {
     return !!(state.me && (state.me.isOwner || (state.me.permissions && state.me.permissions[key] === true)));
   }
+  function isOwner() { return !!(state.me && state.me.isOwner); }
   function pad2(n) { return n < 10 ? "0" + n : "" + n; }
   function fmtDate(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
   function parseDate(s) { var p = s.split("-"); return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)); }
@@ -1193,6 +1227,10 @@
       api("GET", "/api/timeoff"),
       api("GET", "/api/workhours"),
       api("GET", "/api/balances"),
+      // Same reasoning as /api/roadmap and /api/platforms just above —
+      // gated server-side behind "viewOrders" for every caller, so it's
+      // fetched the same way, not unconditionally like /api/balances.
+      hasPerm("viewOrders") ? api("GET", "/api/platform-balances") : Promise.resolve(null),
       api("GET", "/api/auth/me")
     ]).then(function (res) {
       state.clients = new Map(res[0].map(function (c) { return [c.id, c]; }));
@@ -1207,11 +1245,12 @@
       state.timeoff = new Map((res[9] || []).map(function (o) { return [o.id, o]; }));
       state.workhours = new Map((res[10] || []).map(function (w) { return [w.id, w]; }));
       state.balances = new Map((res[11] || []).map(function (b) { return [b.id, b]; }));
+      state.platformBalances = new Map((res[12] || []).map(function (b) { return [b.id, b]; }));
       // Re-sync who "we" are on every poll, not just at login: the owner
       // can grant/revoke permissions for someone who's already using the
       // app, and this is what makes that take effect without them having
       // to log out and back in.
-      if (res[12] && res[12].user) applyMe(res[12].user);
+      if (res[13] && res[13].user) applyMe(res[13].user);
       render();
     }).catch(function (err) {
       if (err && err.code !== "not_authenticated") toast(err.message || t("Не вдалося оновити дані"), true);
@@ -1506,6 +1545,21 @@
   }
   function balanceTotalAll() {
     return balancesList().reduce(function (s, b) { return s + (Number(b.amount) || 0); }, 0);
+  }
+
+  // Same ledger pattern as the worker balances just above, but per order-
+  // source platform (routes/platform-balances.js). Positive = the platform
+  // owes the company; negative = the company owes the platform. Entries
+  // with a jobId were posted automatically from a completed job (see
+  // routes/jobs.js's syncPlatformLedgerForJob) and aren't deletable here —
+  // only manual settlement entries are.
+  function platformBalancesList() { return Array.from(state.platformBalances.values()); }
+  function platformBalanceEntriesFor(platformId) {
+    return platformBalancesList().filter(function (b) { return b.platformId === platformId; })
+      .sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+  }
+  function platformBalanceTotalFor(platformId) {
+    return platformBalanceEntriesFor(platformId).reduce(function (s, b) { return s + (Number(b.amount) || 0); }, 0);
   }
 
   function renderTimeoff() {
@@ -2485,6 +2539,74 @@
   // idPrefix keeps history-panel element ids unique when the same task list
   // is rendered in more than one place at once (the edit modal and a
   // widget-card panel both use this, each with their own prefix).
+  // Owner-managed ledger for this one platform — same shape as the worker
+  // balance section (openBalanceModal), but entries here can also come
+  // in automatically from a completed job (see routes/jobs.js), which
+  // show a "з завдання" tag instead of a delete button since removing
+  // them here would just have the job recreate them on its next save.
+  function renderPlatformBalanceSection(p) {
+    var entries = platformBalanceEntriesFor(p.id);
+    var total = platformBalanceTotalFor(p.id);
+    return '<div class="field"><label>' + t("Баланс з платформою") + '</label>' +
+      '<div class="kv-row" style="margin-bottom:10px;"><div class="k">' + t("Поточний баланс") + '</div><div class="v" style="font-weight:700;">' + fmtMoney(total) + '</div></div>' +
+      (isOwner() ?
+        '<div class="field-row" style="align-items:flex-end; margin-bottom:10px;">' +
+          '<div class="field"><label>' + t("Сума (+ винна платформа, − винні ви)") + '</label><input type="number" step="0.01" id="f-platform-bal-amount" placeholder="200 / -50"></div>' +
+          '<div class="field"><label>' + t("Примітка") + '</label><input type="text" id="f-platform-bal-note" placeholder="' + t("напр. виплата, коригування") + '"></div>' +
+        '</div>' +
+        '<button class="btn btn-sm btn-primary" id="ov-add-platform-balance" type="button">' + t("Додати запис") + '</button>'
+        : '') +
+      '<div class="platform-notes" id="platform-balance-list" style="margin-top:10px;">' + renderPlatformBalanceEntries(entries) + '</div>' +
+    '</div>';
+  }
+
+  function renderPlatformBalanceEntries(entries) {
+    if (!entries.length) return '<div class="empty-note">' + t("Записів ще немає.") + '</div>';
+    return entries.map(function (b) {
+      return '<div class="job-row"><div class="agenda-main"><div class="title">' + fmtMoney(b.amount) + (b.note ? " — " + escapeHtml(b.note) : "") + '</div><div class="cell-sub">' + fmtDateHuman(b.date) + '</div></div>' +
+        (b.jobId
+          ? '<span class="pill lead" style="align-self:center;"><span class="pill-dot"></span>' + t("з завдання") + '</span>'
+          : (isOwner() ? '<button class="icon-btn" data-del-platform-balance="' + b.id + '" title="' + t("Видалити") + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button>' : '')) +
+      '</div>';
+    }).join("");
+  }
+
+  function wirePlatformBalanceSection(pid) {
+    var addBtn = document.getElementById("ov-add-platform-balance");
+    if (addBtn) {
+      addBtn.addEventListener("click", function () {
+        var amount = Number(String(document.getElementById("f-platform-bal-amount").value).replace(",", "."));
+        var note = document.getElementById("f-platform-bal-note").value.trim();
+        if (!amount) { toast(t("Вкажіть суму"), true); return; }
+        api("POST", "/api/platform-balances", { platformId: pid, amount: amount, note: note }).then(function (rec) {
+          state.platformBalances.set(rec.id, rec);
+          toast(t("Запис додано"));
+          var list = document.getElementById("platform-balance-list");
+          if (list) list.innerHTML = renderPlatformBalanceEntries(platformBalanceEntriesFor(pid));
+          var p = state.platforms.get(pid);
+          if (p) {
+            var kv = addBtn.closest(".field").querySelector(".v");
+            if (kv) kv.textContent = fmtMoney(platformBalanceTotalFor(pid));
+          }
+          document.getElementById("f-platform-bal-amount").value = "";
+          document.getElementById("f-platform-bal-note").value = "";
+          wirePlatformBalanceSection(pid);
+        }).catch(function (err) { toast(err.message, true); });
+      });
+    }
+    document.querySelectorAll("[data-del-platform-balance]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-del-platform-balance");
+        api("DELETE", "/api/platform-balances/" + id).then(function () {
+          state.platformBalances.delete(id);
+          var list = document.getElementById("platform-balance-list");
+          if (list) list.innerHTML = renderPlatformBalanceEntries(platformBalanceEntriesFor(pid));
+          wirePlatformBalanceSection(pid);
+        }).catch(function (err) { toast(err.message, true); });
+      });
+    });
+  }
+
   function renderPlatformTasks(p, idPrefix) {
     idPrefix = idPrefix || "task-history-";
     var tasks = Array.isArray(p.tasks) ? p.tasks : [];
@@ -2597,6 +2719,14 @@
             '</div>'
             : '<div class="field"><label>' + t("Нотатка") + '</label><input type="text" id="f-note" placeholder="' + t("Коротко, навіщо (необов'язково)") + '"></div>') +
           '<label class="checkbox-field"><input type="checkbox" id="f-done"' + (p && p.done ? " checked" : "") + '> ' + t("Реєстрацію вже виконано") + '</label>' +
+          '<div class="field"><label>' + t("Способи оплати на цій платформі") + '</label>' +
+            '<div class="checklist-box">' + PAYMENT_METHODS.map(function (m) {
+              var checked = p && Array.isArray(p.paymentMethods) && p.paymentMethods.indexOf(m) !== -1;
+              return '<label class="checkbox-field"><input type="checkbox" class="f-platform-pm" value="' + m + '"' + (checked ? " checked" : "") + '> ' + t(PAYMENT_METHOD_LABELS[m]) + '</label>';
+            }).join("") + '</div>' +
+            '<div class="cell-sub">' + t("Визначає, які способи оплати можна вибрати для замовлення з цієї платформи.") + '</div>' +
+          '</div>' +
+          (p ? renderPlatformBalanceSection(p) : '') +
         '</div>' +
         '<div class="modal-foot">' + (p ? '<button class="btn btn-danger-text" id="ov-delete">' + t("Видалити") + '</button>' : '<span></span>') + '<button class="btn btn-primary" id="ov-save">' + t("Зберегти") + '</button></div>' +
       '</div></div>';
@@ -2608,7 +2738,8 @@
       var url = document.getElementById("f-url").value.trim();
       if (!title) { toast("Вкажіть назву", true); return; }
       if (!url) { toast("Вкажіть посилання", true); return; }
-      var data = { title: title, url: url, done: document.getElementById("f-done").checked };
+      var paymentMethods = Array.from(document.querySelectorAll(".f-platform-pm:checked")).map(function (cb) { return cb.value; });
+      var data = { title: title, url: url, done: document.getElementById("f-done").checked, paymentMethods: paymentMethods };
       if (!p) data.note = document.getElementById("f-note").value.trim();
       var req = p ? api("PATCH", "/api/platforms/" + p.id, data) : api("POST", "/api/platforms", data);
       req.then(function () { toast(p ? t("Платформу оновлено") : t("Платформу додано")); closeOverlay(); loadAll(); })
@@ -2620,6 +2751,7 @@
         api("DELETE", "/api/platforms/" + p.id).then(function () { toast("Платформу видалено"); closeOverlay(); loadAll(); });
       });
       wirePlatformTasks(p.id);
+      wirePlatformBalanceSection(p.id);
       var addTask = function () {
         var input = document.getElementById("f-new-task");
         var title = input.value.trim();
@@ -2799,6 +2931,29 @@
             (canSeePrice ? '<div class="field"><label>' + t("Вартість, €") + '</label><input type="number" id="f-price" value="' + escapeHtml(j.price) + '" min="0" step="1"></div>' : '') +
             '<div class="field"><label>' + t("Тривалість, год") + '</label><input type="number" id="f-hours" value="' + escapeHtml(j.hours != null ? j.hours : "") + '" min="0" step="0.5"></div>' +
           '</div>' +
+          // Which order-source platform this job came from, and how the
+          // client paid — financial/dispatch bookkeeping, so only shown
+          // alongside the price, to the same "viewEarnings" audience.
+          // Drives the automatic platform-balance ledger once the job is
+          // marked done (see routes/jobs.js's syncPlatformLedgerForJob).
+          (canSeePrice ?
+            '<div class="field-row">' +
+              '<div class="field"><label>' + t("Платформа замовлення") + '</label><select id="f-platform">' +
+                '<option value="">' + t("— без платформи —") + '</option>' +
+                platformsList().slice().sort(function (a, b) { return (a.title || "").localeCompare(b.title || ""); }).map(function (p) {
+                  return '<option value="' + p.id + '"' + (j.platformId === p.id ? " selected" : "") + '>' + escapeHtml(p.title) + '</option>';
+                }).join("") +
+              '</select></div>' +
+              '<div class="field" id="f-payment-method-wrap" style="' + (j.platformId ? "" : "display:none;") + '">' +
+                '<label>' + t("Спосіб оплати") + '</label><select id="f-payment-method"></select>' +
+              '</div>' +
+            '</div>' +
+            '<div class="field" id="f-commission-wrap" style="' + (j.platformId && j.paymentMethod ? "" : "display:none;") + '">' +
+              '<label>' + t("Комісія платформи за це замовлення, €") + '</label>' +
+              '<input type="number" id="f-commission" value="' + escapeHtml(j.commission != null ? j.commission : "") + '" min="0" step="0.01">' +
+              '<p class="cell-sub">' + t("За рахунком: з платформи вам належить (вартість − комісія). За готівку/картку: ви лишаєте собі комісію, вона мінусується з балансу платформи.") + '</p>' +
+            '</div>'
+            : '') +
           '<div class="field"><label>' + t("Статус") + '</label><select id="f-status">' +
               ["scheduled", "done", "cancelled"].map(function (s) { return '<option value="' + s + '"' + (j.status === s ? " selected" : "") + '>' + statusLabelJob(s) + '</option>'; }).join("") + '</select></div>' +
           '<div class="field" id="f-cancel-reason-wrap" style="' + (j.status === "cancelled" ? '' : 'display:none;') + '">' +
@@ -2869,6 +3024,17 @@
       // employee without that permission simply can't see.
       var priceEl = document.getElementById("f-price");
       if (priceEl) data.price = priceEl.value ? Number(priceEl.value) : null;
+      // Same reasoning as price: these three only exist in the DOM for
+      // someone with "viewEarnings", so they're only ever sent by someone
+      // who could actually see/set them.
+      var platformEl = document.getElementById("f-platform");
+      if (platformEl) {
+        data.platformId = platformEl.value || null;
+        var pmEl = document.getElementById("f-payment-method");
+        data.paymentMethod = (platformEl.value && pmEl && pmEl.value) ? pmEl.value : null;
+        var commissionEl = document.getElementById("f-commission");
+        data.commission = (commissionEl && commissionEl.value !== "") ? Number(commissionEl.value) : null;
+      }
       var recurFreq = document.getElementById("f-recur-freq").value;
       data.recurrence = recurFreq ? { freq: recurFreq, until: document.getElementById("f-recur-until").value || null } : null;
       var req = id ? api("PATCH", "/api/jobs/" + id, data) : api("POST", "/api/jobs", data);
@@ -2897,6 +3063,38 @@
     document.getElementById("f-status").addEventListener("change", function (e) {
       document.getElementById("f-cancel-reason-wrap").style.display = e.target.value === "cancelled" ? "" : "none";
     });
+    // Payment method options depend on the chosen platform (configured in
+    // "Замовлення" — see openPlatformModal); re-populated every time the
+    // platform changes so you can only pick a method that platform
+    // actually supports.
+    var platformEl = document.getElementById("f-platform");
+    if (platformEl) {
+      var populatePaymentMethods = function (selectedMethod) {
+        var pmWrap = document.getElementById("f-payment-method-wrap");
+        var pmSelect = document.getElementById("f-payment-method");
+        var p = state.platforms.get(platformEl.value);
+        var methods = p && Array.isArray(p.paymentMethods) ? p.paymentMethods : [];
+        if (!platformEl.value) { pmWrap.style.display = "none"; return; }
+        pmWrap.style.display = "";
+        pmSelect.innerHTML = methods.length
+          ? methods.map(function (m) { return '<option value="' + m + '"' + (m === selectedMethod ? " selected" : "") + '>' + t(PAYMENT_METHOD_LABELS[m]) + '</option>'; }).join("")
+          : '<option value="">' + t("— для цієї платформи не налаштовано —") + '</option>';
+      };
+      populatePaymentMethods(j.paymentMethod);
+      platformEl.addEventListener("change", function () {
+        populatePaymentMethods(null);
+        updateCommissionVisibility();
+      });
+      document.getElementById("f-payment-method").addEventListener("change", updateCommissionVisibility);
+    }
+    function updateCommissionVisibility() {
+      var wrap = document.getElementById("f-commission-wrap");
+      if (!wrap) return;
+      var hasPlatform = document.getElementById("f-platform").value;
+      var pmEl = document.getElementById("f-payment-method");
+      var hasMethod = pmEl && pmEl.value;
+      wrap.style.display = (hasPlatform && hasMethod) ? "" : "none";
+    }
     function selectedAssigneeIds() {
       return Array.from(document.querySelectorAll("#f-assignees input[type=checkbox]:checked")).map(function (cb) { return cb.value; });
     }
