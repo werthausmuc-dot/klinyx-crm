@@ -29,6 +29,7 @@ require("./routes/dayplans")(router);
 require("./routes/timeoff")(router);
 require("./routes/workhours")(router);
 require("./routes/balances")(router);
+require("./routes/platform-balances")(router);
 
 async function getCurrentUser(req) {
   // Lazy catch-up (same pattern as the recurring-jobs / auto-invoice logic
