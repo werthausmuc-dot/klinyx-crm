@@ -104,6 +104,9 @@ async function ensureRecurringInstances() {
                                     notes: anchor.notes || "",
                                     assignedTo: Array.isArray(anchor.assignedTo) ? anchor.assignedTo.slice() : (anchor.assignedTo ? [anchor.assignedTo] : []),
                                     paid: false,
+                                    platformId: anchor.platformId || null,
+                                    paymentMethod: anchor.paymentMethod || null,
+                                    commission: anchor.commission != null ? anchor.commission : null,
                                     recurrence: null,
                                     seriesId,
                                     createdBy: anchor.createdBy
@@ -161,6 +164,61 @@ async function maybeAutoInvoiceForDoneJob(job) {
   const invoices = await store.list("invoices");
   if (invoices.some((inv) => inv.jobId === job.id)) return null;
   return createInvoiceForJob(job, price, job.createdBy);
+}
+
+// ---- Баланс розрахунків з платформою-джерелом замовлення ----
+// A job can carry a platformId (which order-source platform it came from —
+// see routes/platforms.js), a paymentMethod (how the client actually
+// paid), and a commission (the platform's cut on THIS order, entered per
+// job since deals vary). Once the job is marked "done", that combination
+// posts one entry to that platform's ledger (routes/platform-balances.js):
+//   - paid "invoice": the platform collected the money and now owes the
+//     company the net amount → entry = +(price − commission).
+//   - paid "cash"/"card": the company collected the full price directly
+//     from the client, keeping the commission the platform would otherwise
+//     have taken → entry = −commission (reduces what the platform owes, or
+//     puts the company in debt to the platform if it goes negative).
+// The job remembers the entry's id (`platformLedgerEntryId`) so editing or
+// un-doing any of these fields later updates or removes that SAME entry
+// instead of leaving stale duplicates behind.
+function computePlatformLedgerAmount(job) {
+  const price = typeof job.price === "number" ? job.price : 0;
+  const commission = job.commission;
+  return job.paymentMethod === "invoice" ? (price - commission) : -commission;
+}
+
+async function syncPlatformLedgerForJob(job) {
+  const shouldHaveEntry = job.status === "done" && job.platformId && job.paymentMethod && typeof job.commission === "number";
+  if (shouldHaveEntry) {
+    const amount = computePlatformLedgerAmount(job);
+    const note = "Завдання від " + job.date + (typeof job.price === "number" && job.price ? " (" + job.price + " €)" : "");
+    const existingEntry = job.platformLedgerEntryId ? await store.get("platformBalances", job.platformLedgerEntryId) : null;
+    if (existingEntry) {
+      await store.update("platformBalances", existingEntry.id, { platformId: job.platformId, amount, date: job.date, note });
+      return;
+    }
+    const created = await store.create("platformBalances", {
+      platformId: job.platformId, amount, date: job.date, note, jobId: job.id, createdBy: job.createdBy || null
+    });
+    await store.update("jobs", job.id, { platformLedgerEntryId: created.id });
+  } else if (job.platformLedgerEntryId) {
+    await store.remove("platformBalances", job.platformLedgerEntryId);
+    await store.update("jobs", job.id, { platformLedgerEntryId: null });
+  }
+}
+
+// Catch-up pass, run on every GET /api/jobs (same lazy pattern as
+// ensureInvoicesForDoneJobs above). Only fills in a ledger entry that's
+// genuinely MISSING — a job already carrying `platformLedgerEntryId` is
+// left alone here, so a normal poll never rewrites the store for jobs that
+// are already in sync.
+async function ensurePlatformLedgerForDoneJobs(jobs) {
+  const candidates = jobs.filter((j) =>
+    j.status === "done" && j.platformId && j.paymentMethod && typeof j.commission === "number" && !j.platformLedgerEntryId
+  );
+  for (const job of candidates) {
+    await syncPlatformLedgerForJob(job);
+  }
 }
 
 // Catch-up pass, run on every GET /api/jobs (same lazy-generation pattern
@@ -222,6 +280,23 @@ function clean(body, existing) {
     }
     if (typeof body.paid === "boolean") data.paid = body.paid;
     if (!existing && data.paid === undefined) data.paid = false;
+    // Which order-source platform this job came from, how the client paid,
+    // and the platform's commission on this specific order — together
+    // these drive the automatic platform-balance ledger entry (see
+    // syncPlatformLedgerForJob below). Commission is entered per order
+    // (deals vary job to job), not a fixed rate on the platform itself.
+    if (body.platformId === null || body.platformId === "") {
+        data.platformId = null;
+        data.paymentMethod = null;
+        data.commission = null;
+    } else if (typeof body.platformId === "string") {
+        data.platformId = body.platformId;
+    }
+    if (body.paymentMethod === null || body.paymentMethod === "") data.paymentMethod = null;
+    else if (["invoice", "cash", "card"].includes(body.paymentMethod)) data.paymentMethod = body.paymentMethod;
+    if (body.commission === null || body.commission === "") data.commission = null;
+    else if (typeof body.commission === "number") data.commission = body.commission;
+    else if (typeof body.commission === "string" && body.commission.trim() !== "" && !Number.isNaN(Number(body.commission))) data.commission = Number(body.commission);
     if (body.recurrence === null) {
           data.recurrence = null;
     } else if (body.recurrence && typeof body.recurrence === "object" && RECUR_FREQS.includes(body.recurrence.freq)) {
@@ -255,6 +330,7 @@ module.exports = function registerJobRoutes(router) {
           // housekeeping step, not something that should depend on who
           // happened to trigger this particular GET.
           await ensureInvoicesForDoneJobs(jobs);
+          await ensurePlatformLedgerForDoneJobs(jobs);
           const visible = (req.user.isOwner || req.user.role === "admin")
                 ? jobs
                 : jobs.filter((j) => canSeeJob(req.user, j));
@@ -271,6 +347,7 @@ module.exports = function registerJobRoutes(router) {
           data.createdBy = req.user.id;
           const created = await store.create("jobs", data);
           const autoInvoice = await maybeAutoInvoiceForDoneJob(created);
+          await syncPlatformLedgerForJob(created);
           sendJson(res, 201, Object.assign({}, created, { autoInvoiceCreated: !!autoInvoice }));
           notify.onJobCreated(created, req.user);
     });
@@ -289,6 +366,7 @@ module.exports = function registerJobRoutes(router) {
           }
           const updated = await store.update("jobs", params.id, patch);
           const autoInvoice = await maybeAutoInvoiceForDoneJob(updated);
+          await syncPlatformLedgerForJob(updated);
           sendJson(res, 200, Object.assign({}, updated, { autoInvoiceCreated: !!autoInvoice }));
           if ("assignedTo" in patch) notify.onJobAssigned(updated, existing.assignedTo);
     });
@@ -316,6 +394,9 @@ module.exports = function registerJobRoutes(router) {
                             await store.update("jobs", anchor.id, { recurrence: Object.assign({}, anchor.recurrence, { excluded }) });
                       }
                 }
+          }
+          if (existing.platformLedgerEntryId) {
+                await store.remove("platformBalances", existing.platformLedgerEntryId);
           }
           await store.remove("jobs", params.id);
           sendJson(res, 200, { ok: true });

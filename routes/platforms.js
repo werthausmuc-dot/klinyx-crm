@@ -15,6 +15,13 @@ function requireOrdersView(req, res) {
   return true;
 }
 
+// Which payment methods a job sourced from this platform is allowed to
+// use — e.g. MyDay only ever bills the client by invoice, while Clean
+// Valley lets the cleaner collect cash or card directly. Drives both the
+// payment-method dropdown on a job (routes/jobs.js) and which commission
+// math applies there.
+const PAYMENT_METHODS = ["invoice", "cash", "card"];
+
 function clean(body) {
   const data = {};
   if (typeof body.title === "string") data.title = body.title.trim();
@@ -26,6 +33,9 @@ function clean(body) {
   if (typeof body.note === "string") data.note = body.note.trim();
   if (typeof body.done === "boolean") data.done = body.done;
   if (body.source === "manual" || body.source === "auto") data.source = body.source;
+  if (Array.isArray(body.paymentMethods)) {
+    data.paymentMethods = body.paymentMethods.filter((m) => PAYMENT_METHODS.includes(m));
+  }
   return data;
 }
 
@@ -46,6 +56,7 @@ module.exports = function registerPlatformRoutes(router) {
     if (!data.url) return sendJson(res, 400, { error: "invalid_input", message: "Вкажіть посилання." });
     if (typeof data.done !== "boolean") data.done = false;
     if (!data.source) data.source = "manual";
+    if (!data.paymentMethods) data.paymentMethods = [];
     data.createdBy = req.user.id;
     sendJson(res, 201, await store.create("platforms", data));
   });
