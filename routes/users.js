@@ -36,7 +36,16 @@ module.exports = function registerUserRoutes(router) {
 
   router.get("/api/users", async (req, res) => {
     if (!requireTeamView(req, res)) return;
-    sendJson(res, 200, (await store.list("users")).map(sanitizeUser));
+    const users = (await store.list("users")).map(sanitizeUser);
+    // Hourly wages are owner-only information, same as the granular
+    // permissions below — an admin who merely has "viewTeam" (but isn't
+    // the owner) manages accounts without seeing what anyone earns.
+    const out = req.user.isOwner ? users : users.map((u) => {
+      const copy = Object.assign({}, u);
+      delete copy.hourlyRate;
+      return copy;
+    });
+    sendJson(res, 200, out);
   });
 
   router.post("/api/users", async (req, res) => {
@@ -106,6 +115,23 @@ module.exports = function registerUserRoutes(router) {
         return sendJson(res, 400, { error: "invalid_input", message: "Пароль має бути не коротшим за 8 символів." });
       }
       patch.passwordHash = hashPassword(String(password));
+    }
+
+    // The hourly wage is owner-only to set, same reasoning as the
+    // permissions block below: what a person earns per hour isn't
+    // something another admin gets to change (or infer, via the team
+    // list — see GET /api/users above).
+    if (typeof body.hourlyRate !== "undefined") {
+      if (!requireOwner(req, res)) return;
+      if (body.hourlyRate === null || body.hourlyRate === "") {
+        patch.hourlyRate = null;
+      } else {
+        const rate = Number(body.hourlyRate);
+        if (Number.isNaN(rate) || rate < 0) {
+          return sendJson(res, 400, { error: "invalid_input", message: "Некоректна ставка оплати." });
+        }
+        patch.hourlyRate = rate;
+      }
     }
 
     // Only the owner grants/revokes the individual permissions below —

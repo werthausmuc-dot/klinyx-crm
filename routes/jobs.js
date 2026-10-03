@@ -80,9 +80,10 @@ async function ensureRecurringInstances() {
                                     service: anchor.service || "",
                                     address: anchor.address || "",
                                     price: anchor.price != null ? anchor.price : null,
+                                    hours: anchor.hours != null ? anchor.hours : null,
                                     status: "scheduled",
                                     notes: anchor.notes || "",
-                                    assignedTo: anchor.assignedTo || null,
+                                    assignedTo: Array.isArray(anchor.assignedTo) ? anchor.assignedTo.slice() : (anchor.assignedTo ? [anchor.assignedTo] : []),
                                     paid: false,
                                     recurrence: null,
                                     seriesId,
@@ -173,6 +174,12 @@ function clean(body, existing) {
     if (body.price === null || body.price === "") data.price = null;
     else if (typeof body.price === "number") data.price = body.price;
     else if (typeof body.price === "string" && body.price.trim() !== "" && !Number.isNaN(Number(body.price))) data.price = Number(body.price);
+    // Estimated/worked hours for this job — the other half (besides a
+    // worker's own hourly rate, set on their user record) of what we show
+    // an assigned worker as their pay, instead of the client-facing price.
+    if (body.hours === null || body.hours === "") data.hours = null;
+    else if (typeof body.hours === "number") data.hours = body.hours;
+    else if (typeof body.hours === "string" && body.hours.trim() !== "" && !Number.isNaN(Number(body.hours))) data.hours = Number(body.hours);
     if (typeof body.notes === "string") data.notes = body.notes.trim();
     if (STATUSES.includes(body.status)) {
         data.status = body.status;
@@ -183,7 +190,17 @@ function clean(body, existing) {
     }
     if (!existing && !data.status) data.status = "scheduled";
     if (typeof body.cancelReason === "string") data.cancelReason = body.cancelReason.trim();
-    if (typeof body.assignedTo === "string" || body.assignedTo === null) data.assignedTo = body.assignedTo || null;
+    // A job can now be assigned to several people at once (a cleaning crew),
+    // so this is always normalized to an array — [] means unassigned. The
+    // old single-id shape (a string, or null) is still accepted here so any
+    // code we haven't touched (or an older cached client) keeps working.
+    if (Array.isArray(body.assignedTo)) {
+        data.assignedTo = body.assignedTo.filter((x) => typeof x === "string" && x);
+    } else if (typeof body.assignedTo === "string") {
+        data.assignedTo = body.assignedTo ? [body.assignedTo] : [];
+    } else if (body.assignedTo === null) {
+        data.assignedTo = [];
+    }
     if (typeof body.paid === "boolean") data.paid = body.paid;
     if (!existing && data.paid === undefined) data.paid = false;
     if (body.recurrence === null) {
@@ -239,7 +256,7 @@ module.exports = function registerJobRoutes(router) {
           const updated = await store.update("jobs", params.id, patch);
           const autoInvoice = await maybeAutoInvoiceForDoneJob(updated);
           sendJson(res, 200, Object.assign({}, updated, { autoInvoiceCreated: !!autoInvoice }));
-          if ("assignedTo" in patch) notify.onJobAssigned(updated, existing.assignedTo || null);
+          if ("assignedTo" in patch) notify.onJobAssigned(updated, existing.assignedTo);
     });
 
     router.delete("/api/jobs/:id", async (req, res, params) => {
